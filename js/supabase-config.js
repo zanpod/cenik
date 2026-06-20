@@ -14,7 +14,7 @@ const SUPABASE_ANON_KEY = window.EPO_SUPABASE_ANON_KEY || 'sb_publishable_PQQcL8
 // point to wherever the site is actually deployed (admin + menu share a domain).
 // Override with window.EPO_APP_DOMAIN only if the menu lives on a different host.
 const APP_DOMAIN = window.EPO_APP_DOMAIN ||
-  (location.protocol.startsWith('http') ? location.origin : 'https://cenik.epo.si');
+  (location.protocol.startsWith('http') ? location.origin : 'https://epocenik.netlify.app');
 
 // Initialise the Supabase client (loaded via CDN as `supabase`).
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
