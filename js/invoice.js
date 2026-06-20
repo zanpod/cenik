@@ -81,20 +81,73 @@ const Invoice = (() => {
     });
   }
 
-  function showReceipt(inv, tableLabel) {
+  async function showReceipt(inv, tableLabel) {
     const body = document.getElementById('inv-body');
+    // FURS potrjevanje samo če je vklopljeno (v testu je fiscal_enabled=false → preskok).
+    const tenant = (window.AdminShell && AdminShell.tenant) || {};
+    if (tenant.fiscal_enabled && !inv.eor) {
+      body.innerHTML = '<div class="spinner"></div><p class="muted text-center">Davčno potrjevanje (FURS)…</p>';
+      inv = await fiscalize(inv);
+    }
+    let qrImg = '';
+    if (inv.zoi && inv.eor) {
+      const qrText = fursQrData(inv.zoi, String(inv.seller_tax_number || '').replace(/^SI/i, ''), inv.issued_at);
+      qrImg = await qrDataUrl(qrText);
+    }
     body.innerHTML = `
-      <div id="receipt-print-area">${receiptHTML(inv, tableLabel)}</div>
+      <div id="receipt-print-area">${receiptHTML(inv, tableLabel, qrImg)}</div>
       <div class="modal-actions no-print">
         <button class="btn" id="inv-close2">Zapri</button>
         <button class="btn btn-primary" id="inv-print">🖨 Natisni</button>
       </div>`;
     document.getElementById('inv-close2').addEventListener('click', close);
-    document.getElementById('inv-print').addEventListener('click', () => printReceipt(inv, tableLabel));
+    document.getElementById('inv-print').addEventListener('click', () => printReceipt(inv, tableLabel, qrImg));
+  }
+
+  // Pokliče Edge funkcijo za davčno potrjevanje (samo če je FURS vklopljen).
+  async function fiscalize(inv) {
+    try {
+      const { data, error } = await sb.functions.invoke('furs-fiscalize', { body: { invoice_id: inv.id } });
+      if (error) throw error;
+      if (data && data.eor) return { ...inv, zoi: data.zoi, eor: data.eor, is_fiscal: true };
+      throw new Error((data && data.message) || 'Brez EOR');
+    } catch (e) {
+      console.error(e);
+      toast('Davčno potrjevanje ni uspelo — račun ostaja nepotrjen.', 'error', 5000);
+      return inv;
+    }
+  }
+
+  // QR vsebina po FURS (60 števk) — zrcali supabase/functions/_shared/furs.ts.
+  function fursQrData(zoiHex, taxNumber, iso) {
+    const dec = BigInt('0x' + zoiHex).toString().padStart(39, '0');
+    const d = new Date(iso); const p = (n) => String(n).padStart(2, '0');
+    const dt = String(d.getFullYear()).slice(2) + p(d.getMonth() + 1) + p(d.getDate()) +
+      p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds());
+    const base = dec + String(taxNumber).padStart(8, '0') + dt;
+    const ctrl = (base.split('').reduce((a, c) => a + Number(c), 0) % 10).toString();
+    return base + ctrl;
+  }
+
+  function qrDataUrl(text) {
+    return new Promise((resolve) => {
+      if (!window.QRCode) return resolve('');
+      const tmp = document.createElement('div');
+      tmp.style.display = 'none';
+      document.body.appendChild(tmp);
+      new QRCode(tmp, { text, width: 150, height: 150, correctLevel: QRCode.CorrectLevel.M });
+      setTimeout(() => {
+        const c = tmp.querySelector('canvas');
+        const img = tmp.querySelector('img');
+        const url = c ? c.toDataURL('image/png') : (img ? img.src : '');
+        tmp.remove();
+        resolve(url);
+      }, 60);
+    });
   }
 
   // --- Receipt markup (vsi obvezni elementi po ZDDV-1) ----------------------
-  function receiptHTML(inv, tableLabel) {
+  function receiptHTML(inv, tableLabel, qrImg) {
     const cur = inv.currency || '€';
     const items = (inv.items || []).map((it) => `
       <tr>
@@ -119,8 +172,9 @@ const Invoice = (() => {
 
     const cols = inv.seller_vat_registered ? 5 : 4;
 
-    const fiscalBlock = inv.is_fiscal
-      ? `<div class="rcpt-row"><span>ZOI:</span><span>${esc(inv.zoi || '—')}</span></div>
+    const fiscalBlock = (inv.is_fiscal && inv.eor)
+      ? `${qrImg ? `<div class="rcpt-qr"><img src="${qrImg}" alt="FURS QR" width="140" height="140"></div>` : ''}
+         <div class="rcpt-row"><span>ZOI:</span><span>${esc(inv.zoi || '—')}</span></div>
          <div class="rcpt-row"><span>EOR:</span><span>${esc(inv.eor || '—')}</span></div>`
       : `<div class="rcpt-test">⚠️ TESTNI RAČUN — NI DAVČNO POTRJEN (ZDavPR).<br>
            Ne uporabljati v pravnem prometu. Davčno potrjevanje (FURS: ZOI / EOR / QR) se aktivira pred uporabo v živo.</div>`;
@@ -171,13 +225,13 @@ const Invoice = (() => {
   }
 
   // --- Print v ločenem oknu (čist izpis, primeren za 80mm/A4) ----------------
-  function printReceipt(inv, tableLabel) {
+  function printReceipt(inv, tableLabel, qrImg) {
     const w = window.open('', '_blank', 'width=400,height=640');
     if (!w) { toast('Brskalnik je blokiral pojavno okno za tisk.', 'error'); return; }
     w.document.write(`<!DOCTYPE html><html lang="sl"><head><meta charset="utf-8">
       <title>Račun ${esc(inv.invoice_number)}</title>
       <style>${PRINT_CSS}</style></head>
-      <body onload="window.print()">${receiptHTML(inv, tableLabel)}</body></html>`);
+      <body onload="window.print()">${receiptHTML(inv, tableLabel, qrImg)}</body></html>`);
     w.document.close();
   }
 
@@ -198,6 +252,8 @@ const Invoice = (() => {
     .rcpt-total { display:flex; justify-content:space-between; font-weight:800; font-size:17px; margin:10px 0; border-top:2px solid #000; border-bottom:2px solid #000; padding:8px 0; }
     .rcpt-fiscal { margin:10px 0; }
     .rcpt-test { border:2px dashed #c00; color:#c00; padding:8px; font-size:11px; font-weight:700; text-align:center; border-radius:6px; }
+    .rcpt-qr { text-align:center; margin:8px 0; }
+    .rcpt-qr img { width:140px; height:140px; }
     .rcpt-foot { text-align:center; margin-top:12px; font-size:12px; }
   `;
 
