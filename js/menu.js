@@ -302,17 +302,27 @@
     const orderNote = document.getElementById('order-note').value.trim();
 
     try {
-      const { data: order, error: oe } = await sb.from('orders').insert({
+      // Generate the order id client-side: anonymous customers may INSERT but
+      // not SELECT orders (per RLS), so we must not request the row back via
+      // .select() — that would require read access and fail.
+      const orderId = (crypto.randomUUID && crypto.randomUUID()) ||
+        ('xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+          const r = Math.random() * 16 | 0;
+          return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+        }));
+
+      const { error: oe } = await sb.from('orders').insert({
+        id: orderId,
         tenant_id: tenant.id,
         table_id: table.id,
         status: 'new',
         notes: orderNote || null,
         total: Number(total.toFixed(2)),
-      }).select().single();
+      });
       if (oe) throw oe;
 
       const rows = items.map((it) => ({
-        order_id: order.id,
+        order_id: orderId,
         menu_item_id: it.id,
         tenant_id: tenant.id,
         item_name: it.name,
