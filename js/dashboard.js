@@ -155,6 +155,10 @@
     } else if (o.status === 'served') {
       actions = `<button class="btn btn-sm" data-act="preparing" data-id="${o.id}">↩ V pripravo</button>`;
     }
+    // Invoice button for any non-cancelled order.
+    if (o.status !== 'cancelled') {
+      actions += `<button class="btn btn-sm" data-invoice="${o.id}">🧾 Račun</button>`;
+    }
 
     return `
       <div class="order-card glass" data-order="${o.id}">
@@ -177,6 +181,14 @@
   }
 
   function wireOrderActions() {
+    document.querySelectorAll('[data-invoice]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const o = orders.find((x) => x.id === btn.dataset.invoice);
+        const table = o && tablesById[o.table_id];
+        const label = table ? (table.label || `Miza ${table.table_number}`) : '';
+        Invoice.open({ id: btn.dataset.invoice }, label);
+      });
+    });
     document.querySelectorAll('[data-act]').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const id = btn.dataset.id;

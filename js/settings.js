@@ -33,6 +33,24 @@
         <button class="btn btn-primary" id="s-save">Shrani nastavitve</button>
       </div>
 
+      <div class="card glass" style="margin-bottom:18px; max-width:620px">
+        <h2 style="margin-top:0">Izdajanje računov</h2>
+        <p class="muted" style="margin-top:-4px">Podatki za račune po slovenski zakonodaji (ZDDV-1). Davčno potrjevanje (FURS) je v testnem načinu izklopljeno — računi so označeni kot <strong>testni / ni davčno potrjen</strong>.</p>
+        <div class="field"><label>Naziv firme (na računu)</label><input class="input" id="s-business" value="${esc(tenant.business_name || '')}" placeholder="npr. Bar Lipa, Janez Novak s.p." /></div>
+        <div class="field"><label>Naslov sedeža</label><input class="input" id="s-address" value="${esc(tenant.address || '')}" placeholder="Ulica 1, 1000 Ljubljana" /></div>
+        <div class="row wrap">
+          <div class="field" style="flex:1"><label>Davčna številka</label><input class="input" id="s-tax" value="${esc(tenant.tax_number || '')}" placeholder="12345678" /></div>
+          <div class="field" style="width:150px"><label>Privzeta stopnja DDV (%)</label><input class="input" type="number" step="0.5" id="s-vatrate" value="${tenant.default_vat_rate ?? 22}" /></div>
+        </div>
+        <label class="switch" style="margin:6px 0 14px"><input type="checkbox" id="s-vatreg" ${tenant.vat_registered ? 'checked' : ''}/><span class="track"></span><span>Zavezanec za DDV</span></label>
+        <div class="row wrap">
+          <div class="field" style="flex:1"><label>Oznaka poslovnega prostora</label><input class="input" id="s-premise" value="${esc(tenant.premise_label || 'P1')}" /></div>
+          <div class="field" style="flex:1"><label>Oznaka blagajne</label><input class="input" id="s-device" value="${esc(tenant.device_label || 'BL1')}" /></div>
+        </div>
+        <div class="muted" style="font-size:.8rem;margin-bottom:14px">Številka računa bo oblike <code>${esc(tenant.premise_label || 'P1')}-${esc(tenant.device_label || 'BL1')}-N</code> (zaporedno, brez vrzeli).</div>
+        <button class="btn btn-primary" id="s-save-fiscal">Shrani podatke za račune</button>
+      </div>
+
       <div class="card glass" style="max-width:620px">
         <h2 style="margin-top:0">Osebje</h2>
         <p class="muted">Povabite osebje. Po registraciji jih povežite z restavracijo.</p>
@@ -50,8 +68,33 @@
       </div>`;
 
     document.getElementById('s-save').addEventListener('click', save);
+    document.getElementById('s-save-fiscal').addEventListener('click', saveFiscal);
     const inviteBtn = document.getElementById('invite-btn');
     if (inviteBtn) inviteBtn.addEventListener('click', invite);
+  }
+
+  async function saveFiscal() {
+    const btn = document.getElementById('s-save-fiscal');
+    btn.disabled = true; btn.textContent = 'Shranjujem…';
+    try {
+      const payload = {
+        business_name: document.getElementById('s-business').value.trim() || null,
+        address: document.getElementById('s-address').value.trim() || null,
+        tax_number: document.getElementById('s-tax').value.trim() || null,
+        vat_registered: document.getElementById('s-vatreg').checked,
+        default_vat_rate: Number(document.getElementById('s-vatrate').value) || 22,
+        premise_label: document.getElementById('s-premise').value.trim() || 'P1',
+        device_label: document.getElementById('s-device').value.trim() || 'BL1',
+      };
+      const { error } = await sb.from('tenants').update(payload).eq('id', tenant.id);
+      if (error) throw error;
+      tenant = { ...tenant, ...payload };
+      toast('Podatki za račune shranjeni.', 'success');
+    } catch (err) {
+      console.error(err); toast('Napaka pri shranjevanju.', 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Shrani podatke za račune';
+    }
   }
 
   async function uploadLogo(file) {

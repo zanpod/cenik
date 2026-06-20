@@ -191,7 +191,28 @@
 .stat-value { font-size: 1.8rem; font-weight: 800; }
 .stat-label { color: var(--text-2); font-size: 0.85rem; }
 
-/* --- Print (QR sheet) ------------------------------------------------------*/
+/* --- Receipt (invoice) preview in modal ------------------------------------*/
+.receipt { font-size: 0.9rem; }
+.rcpt-head { text-align: center; margin-bottom: 12px; }
+.rcpt-seller-name { font-weight: 800; font-size: 1.05rem; }
+.rcpt-note-small { font-size: 0.74rem; color: var(--text-2); margin-top: 4px; }
+.rcpt-title { text-align: center; font-weight: 800; font-size: 1.2rem; letter-spacing: 3px; margin: 12px 0; border-top: 1px dashed var(--glass-border); border-bottom: 1px dashed var(--glass-border); padding: 8px 0; }
+.rcpt-row { display: flex; justify-content: space-between; gap: 10px; margin: 3px 0; }
+.rcpt-row span:first-child { color: var(--text-2); }
+.rcpt-table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+.rcpt-table th, .rcpt-table td { text-align: left; padding: 5px 4px; border-bottom: 1px solid var(--glass-border); font-size: 0.84rem; }
+.rcpt-table .r { text-align: right; }
+.rcpt-table tfoot td { font-weight: 700; border-top: 1px solid var(--text-2); border-bottom: none; }
+.rcpt-vat th, .rcpt-vat td { font-size: 0.78rem; color: var(--text-1); }
+.rcpt-total { display: flex; justify-content: space-between; font-weight: 800; font-size: 1.2rem; margin: 12px 0; border-top: 2px solid var(--text-1); border-bottom: 2px solid var(--text-1); padding: 10px 0; }
+.rcpt-fiscal { margin: 12px 0; }
+.rcpt-test { border: 2px dashed var(--danger); color: var(--danger); padding: 10px; font-size: 0.78rem; font-weight: 700; text-align: center; border-radius: var(--radius-sm); }
+.rcpt-foot { text-align: center; margin-top: 14px; color: var(--text-2); }
+
+@media print {
+  .sidebar, .bottom-tabs, .admin-header, .no-print, .modal-head { display: none !important; }
+}
+
 @media print {
   body { background: #fff !important; color: #000 !important; }
   .sidebar, .bottom-tabs, .admin-header, .no-print { display: none !important; }

@@ -91,23 +91,33 @@
     host.innerHTML = `
       <div class="card glass" style="overflow-x:auto">
         <table class="data-table">
-          <thead><tr><th>Čas</th><th>Miza</th><th>Izdelki</th><th>Status</th><th>Skupaj</th></tr></thead>
+          <thead><tr><th>Čas</th><th>Miza</th><th>Izdelki</th><th>Status</th><th>Skupaj</th><th></th></tr></thead>
           <tbody>${rows.map(rowHtml).join('')}</tbody>
         </table>
       </div>`;
+    wireInvoiceButtons();
   }
 
   function rowHtml(o) {
     const t = tablesById[o.table_id];
     const label = t ? (t.label || `Miza ${t.table_number}`) : 'Miza ?';
     const items = o.items.map((i) => `${i.quantity}× ${esc(i.item_name)}`).join(', ');
+    const invBtn = o.status !== 'cancelled'
+      ? `<button class="btn btn-sm" data-invoice="${o.id}" data-label="${esc(label)}">🧾 Račun</button>` : '';
     return `<tr>
       <td>${formatDateTime(o.created_at)}</td>
       <td>${esc(label)}</td>
       <td>${items}${o.notes ? `<div class="muted" style="font-size:.82rem">📝 ${esc(o.notes)}</div>` : ''}</td>
       <td><span class="badge badge-${o.status}">${STATUS_LABELS[o.status]}</span></td>
       <td><strong>${formatPrice(o.total, tenant.currency)}</strong></td>
+      <td>${invBtn}</td>
     </tr>`;
+  }
+
+  function wireInvoiceButtons() {
+    document.querySelectorAll('[data-invoice]').forEach((btn) => {
+      btn.addEventListener('click', () => Invoice.open({ id: btn.dataset.invoice }, btn.dataset.label));
+    });
   }
 
   function exportCsv() {

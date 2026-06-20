@@ -157,6 +157,7 @@
     document.getElementById('item-price').value = it?.price ?? '';
     document.getElementById('item-sort').value = it?.sort_order ?? 0;
     document.getElementById('item-allergens').value = it?.allergens || '';
+    document.getElementById('item-vat').value = (it?.vat_rate ?? '') === null ? '' : (it?.vat_rate ?? '');
     document.getElementById('item-available').checked = it ? it.is_available : true;
     document.getElementById('item-image').value = '';
     document.getElementById('item-image-preview').textContent = it?.image_url ? 'Trenutna slika je nastavljena.' : '';
@@ -192,6 +193,7 @@
         sort_order: Number(document.getElementById('item-sort').value) || 0,
         category_id: document.getElementById('item-category').value || null,
         allergens: document.getElementById('item-allergens').value.trim() || null,
+        vat_rate: document.getElementById('item-vat').value === '' ? null : Number(document.getElementById('item-vat').value),
         is_available: document.getElementById('item-available').checked,
       };
       const file = document.getElementById('item-image').files[0];
