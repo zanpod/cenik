@@ -9,8 +9,12 @@
 const SUPABASE_URL = window.EPO_SUPABASE_URL || 'https://mctepmjamozqlihbpmrs.supabase.co';
 const SUPABASE_ANON_KEY = window.EPO_SUPABASE_ANON_KEY || 'sb_publishable_PQQcL8a12OPY6_Zxgk3fJg_ULsSwJvZ';
 
-// The public app domain, used when generating QR codes (must match deployment).
-const APP_DOMAIN = window.EPO_APP_DOMAIN || 'https://cenik.epo.si';
+// The public app domain, used when generating QR codes.
+// Defaults to the domain the page is currently served from, so QR codes always
+// point to wherever the site is actually deployed (admin + menu share a domain).
+// Override with window.EPO_APP_DOMAIN only if the menu lives on a different host.
+const APP_DOMAIN = window.EPO_APP_DOMAIN ||
+  (location.protocol.startsWith('http') ? location.origin : 'https://cenik.epo.si');
 
 // Initialise the Supabase client (loaded via CDN as `supabase`).
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
