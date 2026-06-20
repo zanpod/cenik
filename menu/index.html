@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#0a0b14" />
+  <title>Meni — EPO.SI</title>
+  <meta name="description" content="Digitalni meni in naročanje za mizo." />
+  <link rel="stylesheet" href="/css/common.css" />
+  <link rel="stylesheet" href="/css/menu.css" />
+</head>
+<body class="menu-body">
+  <div id="offline-banner" class="offline-banner">⚠️ Ni povezave</div>
+
+  <!-- Loading -->
+  <div id="loading-state" class="fullscreen-state">
+    <div class="spinner"></div>
+    <p class="muted">Nalagam meni…</p>
+  </div>
+
+  <!-- Invalid QR / error -->
+  <div id="error-state" class="fullscreen-state hidden">
+    <div class="emoji">📵</div>
+    <h2 id="error-title">QR koda ni veljavna</h2>
+    <p class="muted" id="error-msg">Prosimo, skenirajte kodo na vaši mizi.</p>
+  </div>
+
+  <!-- Main app -->
+  <div id="menu-app" class="menu-app hidden">
+    <header class="menu-header">
+      <div class="menu-header-top">
+        <img id="tenant-logo" class="tenant-logo placeholder hidden" alt="" />
+        <div>
+          <div id="tenant-name" class="tenant-name">—</div>
+        </div>
+        <div class="table-pill">🪑 <span id="table-label">Miza</span></div>
+      </div>
+      <nav id="cat-tabs" class="cat-tabs"></nav>
+    </header>
+
+    <main id="menu-list" class="menu-list"></main>
+  </div>
+
+  <!-- Sticky cart bar -->
+  <div id="cart-bar" class="cart-bar">
+    <span class="cart-bar-count" id="cart-bar-count">0</span>
+    <span class="cart-bar-label">Košarica</span>
+    <span class="cart-bar-total" id="cart-bar-total">0,00 €</span>
+  </div>
+
+  <!-- Cart sheet -->
+  <div id="sheet-backdrop" class="sheet-backdrop"></div>
+  <section id="cart-sheet" class="cart-sheet" aria-label="Košarica">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <h2>🛒 Košarica</h2>
+      <button id="sheet-close" class="btn btn-ghost btn-icon sheet-close" aria-label="Zapri">✕</button>
+    </div>
+    <div id="sheet-body" class="sheet-body"></div>
+    <div class="sheet-footer">
+      <div class="field order-note">
+        <label for="order-note">Opomba k naročilu</label>
+        <textarea id="order-note" class="textarea" placeholder="npr. brez sladkorja, alergija na orešičke…"></textarea>
+      </div>
+      <div class="summary-row summary-total">
+        <span class="label">Skupaj</span>
+        <span class="value" id="sheet-total">0,00 €</span>
+      </div>
+      <button id="submit-order" class="btn btn-primary btn-block">Pošlji naročilo</button>
+    </div>
+  </section>
+
+  <!-- Confirmation -->
+  <div id="confirm-overlay" class="confirm-overlay">
+    <div class="confirm-card glass">
+      <div class="confirm-check">✅</div>
+      <h2>Naročilo poslano!</h2>
+      <p class="muted" id="confirm-msg">Vaše naročilo je bilo uspešno oddano. Hvala!</p>
+      <button id="confirm-again" class="btn btn-primary btn-block" style="margin-top:18px">Novo naročilo</button>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/js/supabase-config.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/cart.js"></script>
+  <script src="/js/menu.js"></script>
+</body>
+</html>

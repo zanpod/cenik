@@ -1,0 +1,2 @@
+# Customer menu — tenant slug is dynamic, rewrite to the single menu page.
+/menu/*  /menu/index.html  200

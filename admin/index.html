@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0a0b14" />
+  <title>Prijava — EPO.SI Admin</title>
+  <link rel="stylesheet" href="/css/common.css" />
+  <link rel="stylesheet" href="/css/admin.css" />
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="login-card glass">
+      <div class="login-logo">EPO.SI</div>
+      <h1>Prijava za osebje</h1>
+      <form id="login-form">
+        <div class="field">
+          <label for="email">E-pošta</label>
+          <input class="input" type="email" id="email" autocomplete="email" required />
+        </div>
+        <div class="field">
+          <label for="password">Geslo</label>
+          <input class="input" type="password" id="password" autocomplete="current-password" required />
+        </div>
+        <button class="btn btn-primary btn-block" type="submit" id="login-btn">Prijava</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/js/supabase-config.js"></script>
+  <script src="/js/common.js"></script>
+  <script>
+    (async function () {
+      // Already logged in? go to dashboard.
+      const { data: { session } } = await sb.auth.getSession();
+      if (session) location.replace('/admin/dashboard.html');
+
+      document.getElementById('login-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('login-btn');
+        btn.disabled = true; btn.textContent = 'Prijavljam…';
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
+        const { error } = await sb.auth.signInWithPassword({ email, password });
+        if (error) {
+          toast('Napačna e-pošta ali geslo.', 'error');
+          btn.disabled = false; btn.textContent = 'Prijava';
+          return;
+        }
+        location.replace('/admin/dashboard.html');
+      });
+    })();
+  </script>
+</body>
+</html>

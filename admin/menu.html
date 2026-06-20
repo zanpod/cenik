@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0a0b14" />
+  <title>Upravljanje menija — EPO.SI Admin</title>
+  <link rel="stylesheet" href="/css/common.css" />
+  <link rel="stylesheet" href="/css/admin.css" />
+</head>
+<body>
+  <div id="admin-shell" class="admin-shell"></div>
+
+  <!-- Category modal -->
+  <div class="modal-backdrop" id="cat-modal">
+    <div class="modal glass">
+      <div class="modal-head"><h2 id="cat-modal-title">Kategorija</h2><button class="btn btn-ghost btn-icon" data-close="cat-modal">✕</button></div>
+      <div class="field"><label>Ime</label><input class="input" id="cat-name" placeholder="npr. Tople pijače" /></div>
+      <div class="field"><label>Ikona (emoji)</label><input class="input" id="cat-icon" placeholder="☕" /></div>
+      <div class="field"><label>Vrstni red</label><input class="input" type="number" id="cat-sort" value="0" /></div>
+      <label class="switch"><input type="checkbox" id="cat-active" checked /><span class="track"></span><span>Aktivna</span></label>
+      <div class="modal-actions">
+        <button class="btn" data-close="cat-modal">Prekliči</button>
+        <button class="btn btn-primary" id="cat-save">Shrani</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Item modal -->
+  <div class="modal-backdrop" id="item-modal">
+    <div class="modal glass">
+      <div class="modal-head"><h2 id="item-modal-title">Izdelek</h2><button class="btn btn-ghost btn-icon" data-close="item-modal">✕</button></div>
+      <div class="field"><label>Ime</label><input class="input" id="item-name" placeholder="npr. Ledeni čaj" /></div>
+      <div class="field"><label>Opis</label><textarea class="textarea" id="item-desc" placeholder="Domači ledeni čaj z limono"></textarea></div>
+      <div class="row">
+        <div class="field" style="flex:1"><label>Cena</label><input class="input" type="number" step="0.01" id="item-price" placeholder="3.50" /></div>
+        <div class="field" style="flex:1"><label>Vrstni red</label><input class="input" type="number" id="item-sort" value="0" /></div>
+      </div>
+      <div class="field"><label>Kategorija</label><select class="select" id="item-category"></select></div>
+      <div class="field"><label>Alergeni</label><input class="input" id="item-allergens" placeholder="npr. gluten, laktoza" /></div>
+      <div class="field"><label>Slika</label><input class="input" type="file" id="item-image" accept="image/*" /><div id="item-image-preview" class="muted" style="margin-top:6px"></div></div>
+      <label class="switch"><input type="checkbox" id="item-available" checked /><span class="track"></span><span>Na voljo</span></label>
+      <div class="modal-actions">
+        <button class="btn" data-close="item-modal">Prekliči</button>
+        <button class="btn btn-primary" id="item-save">Shrani</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/js/supabase-config.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/admin-auth.js"></script>
+  <script src="/js/menu-manage.js"></script>
+</body>
+</html>

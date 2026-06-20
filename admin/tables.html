@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0a0b14" />
+  <title>Upravljanje miz — EPO.SI Admin</title>
+  <link rel="stylesheet" href="/css/common.css" />
+  <link rel="stylesheet" href="/css/admin.css" />
+</head>
+<body>
+  <div id="admin-shell" class="admin-shell"></div>
+
+  <!-- Table modal -->
+  <div class="modal-backdrop" id="table-modal">
+    <div class="modal glass">
+      <div class="modal-head"><h2 id="table-modal-title">Miza</h2><button class="btn btn-ghost btn-icon" data-close="table-modal">✕</button></div>
+      <div class="field"><label>Številka mize</label><input class="input" type="number" id="table-number" placeholder="1" /></div>
+      <div class="field"><label>Oznaka (neobvezno)</label><input class="input" id="table-label" placeholder="npr. Terasa 1, VIP" /></div>
+      <label class="switch"><input type="checkbox" id="table-active" checked /><span class="track"></span><span>Aktivna</span></label>
+      <div class="modal-actions">
+        <button class="btn" data-close="table-modal">Prekliči</button>
+        <button class="btn btn-primary" id="table-save">Shrani</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="/js/supabase-config.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/admin-auth.js"></script>
+  <script src="/js/tables.js"></script>
+</body>
+</html>
