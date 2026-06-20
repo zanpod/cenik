@@ -6,8 +6,8 @@
 // (Project Settings → API in the Supabase dashboard.)
 // ============================================================================
 
-const SUPABASE_URL = window.EPO_SUPABASE_URL || 'https://YOUR-PROJECT.supabase.co';
-const SUPABASE_ANON_KEY = window.EPO_SUPABASE_ANON_KEY || 'YOUR-ANON-KEY';
+const SUPABASE_URL = window.EPO_SUPABASE_URL || 'https://mctepmjamozqlihbpmrs.supabase.co';
+const SUPABASE_ANON_KEY = window.EPO_SUPABASE_ANON_KEY || 'sb_publishable_PQQcL8a12OPY6_Zxgk3fJg_ULsSwJvZ';
 
 // The public app domain, used when generating QR codes (must match deployment).
 const APP_DOMAIN = window.EPO_APP_DOMAIN || 'https://cenik.epo.si';
