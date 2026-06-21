@@ -651,3 +651,320 @@ DROP TRIGGER IF EXISTS orders_restock_on_cancel ON orders;
 CREATE TRIGGER orders_restock_on_cancel
   AFTER UPDATE ON orders
   FOR EACH ROW EXECUTE FUNCTION restock_on_cancel();
+
+
+-- ============================================================================
+-- EPO.SI — Migration 004: Surovine (sestavine), recepture, gibanje zaloge
+-- ----------------------------------------------------------------------------
+-- Run AFTER 003_inventory.sql. Idempotent.
+--
+-- Vodja lokala lahko:
+--   - vodi surovine (kava, mleko ...) z enoto in zalogo,
+--   - vsakemu izdelku določi recepturo (npr. kava z mlekom = 8 g kave + 10 ml
+--     mleka), ki se ob prodaji samodejno odpiše iz zaloge surovin,
+--   - beleži prevzem (intake) surovin.
+-- Vse gibanje (prodaja/preklic/prevzem/popravek) se beleži v ingredient_movements.
+-- ============================================================================
+
+-- ---- Surovine --------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS ingredients (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id      UUID REFERENCES tenants(id) ON DELETE CASCADE NOT NULL,
+  name           TEXT NOT NULL,                 -- "Kava", "Mleko"
+  unit           TEXT DEFAULT 'kos',            -- g, ml, kos, l, kg
+  stock_quantity NUMERIC(12,3) DEFAULT 0,
+  low_threshold  NUMERIC(12,3) DEFAULT 0,       -- opozorilo o nizki zalogi
+  created_at     TIMESTAMPTZ DEFAULT now()
+);
+
+-- ---- Receptura (poraba surovin na 1 prodan kos izdelka) ---------------------
+CREATE TABLE IF NOT EXISTS item_ingredients (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id     UUID REFERENCES tenants(id) ON DELETE CASCADE NOT NULL,
+  menu_item_id  UUID REFERENCES menu_items(id) ON DELETE CASCADE NOT NULL,
+  ingredient_id UUID REFERENCES ingredients(id) ON DELETE CASCADE NOT NULL,
+  quantity      NUMERIC(12,3) NOT NULL DEFAULT 0,   -- npr. 8 (g) ali 10 (ml)
+  UNIQUE (menu_item_id, ingredient_id)
+);
+
+-- ---- Dnevnik gibanja zaloge surovin ----------------------------------------
+CREATE TABLE IF NOT EXISTS ingredient_movements (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id     UUID REFERENCES tenants(id) ON DELETE CASCADE NOT NULL,
+  ingredient_id UUID REFERENCES ingredients(id) ON DELETE CASCADE,
+  delta         NUMERIC(12,3) NOT NULL,         -- + prevzem, − poraba
+  reason        TEXT NOT NULL,                  -- intake|sale|cancel|adjust
+  order_id      UUID REFERENCES orders(id) ON DELETE SET NULL,
+  note          TEXT,
+  created_at    TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ingredients_tenant ON ingredients(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_item_ingredients_item ON item_ingredients(menu_item_id);
+CREATE INDEX IF NOT EXISTS idx_ing_moves_tenant ON ingredient_movements(tenant_id, created_at);
+
+-- ---- RLS (samo prijavljeno osebje svojega lokala) --------------------------
+ALTER TABLE ingredients          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE item_ingredients     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ingredient_movements ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS ingredients_admin_all ON ingredients;
+CREATE POLICY ingredients_admin_all ON ingredients FOR ALL TO authenticated
+  USING (tenant_id = current_tenant_id()) WITH CHECK (tenant_id = current_tenant_id());
+
+DROP POLICY IF EXISTS item_ingredients_admin_all ON item_ingredients;
+CREATE POLICY item_ingredients_admin_all ON item_ingredients FOR ALL TO authenticated
+  USING (tenant_id = current_tenant_id()) WITH CHECK (tenant_id = current_tenant_id());
+
+DROP POLICY IF EXISTS ing_moves_admin_all ON ingredient_movements;
+CREATE POLICY ing_moves_admin_all ON ingredient_movements FOR ALL TO authenticated
+  USING (tenant_id = current_tenant_id()) WITH CHECK (tenant_id = current_tenant_id());
+
+-- ============================================================================
+-- Odpis zaloge ob prodaji — RAZŠIRJENO: poleg končnega izdelka (track_stock)
+-- odpiše tudi surovine po recepturi in zabeleži gibanje. SECURITY DEFINER, da
+-- deluje tudi za anonimna QR naročila.
+-- ============================================================================
+CREATE OR REPLACE FUNCTION decrement_stock()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.menu_item_id IS NOT NULL THEN
+    -- končni izdelek (npr. ustekleničena pijača)
+    UPDATE menu_items
+       SET stock_quantity = stock_quantity - NEW.quantity
+     WHERE id = NEW.menu_item_id AND track_stock = true;
+
+    -- surovine po recepturi
+    UPDATE ingredients i
+       SET stock_quantity = i.stock_quantity - (ii.quantity * NEW.quantity)
+      FROM item_ingredients ii
+     WHERE ii.menu_item_id = NEW.menu_item_id AND ii.ingredient_id = i.id;
+
+    INSERT INTO ingredient_movements (tenant_id, ingredient_id, delta, reason, order_id)
+    SELECT NEW.tenant_id, ii.ingredient_id, -(ii.quantity * NEW.quantity), 'sale', NEW.order_id
+      FROM item_ingredients ii
+     WHERE ii.menu_item_id = NEW.menu_item_id;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+-- Vrnitev zaloge ob preklicu — vključno s surovinami.
+CREATE OR REPLACE FUNCTION restock_on_cancel()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.status = 'cancelled' AND OLD.status <> 'cancelled' THEN
+    UPDATE menu_items mi
+       SET stock_quantity = mi.stock_quantity + oi.quantity
+      FROM order_items oi
+     WHERE oi.order_id = NEW.id AND oi.menu_item_id = mi.id AND mi.track_stock = true;
+
+    UPDATE ingredients i
+       SET stock_quantity = i.stock_quantity + (ii.quantity * oi.quantity)
+      FROM order_items oi
+      JOIN item_ingredients ii ON ii.menu_item_id = oi.menu_item_id
+     WHERE oi.order_id = NEW.id AND ii.ingredient_id = i.id;
+
+    INSERT INTO ingredient_movements (tenant_id, ingredient_id, delta, reason, order_id)
+    SELECT NEW.tenant_id, ii.ingredient_id, (ii.quantity * oi.quantity), 'cancel', NEW.id
+      FROM order_items oi
+      JOIN item_ingredients ii ON ii.menu_item_id = oi.menu_item_id
+     WHERE oi.order_id = NEW.id;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+-- ============================================================================
+-- RPC: prevzem / popravek zaloge surovine (atomarno + dnevnik).
+-- ============================================================================
+CREATE OR REPLACE FUNCTION receive_ingredient(
+  p_ingredient_id UUID,
+  p_delta         NUMERIC,
+  p_reason        TEXT DEFAULT 'intake',
+  p_note          TEXT DEFAULT NULL
+) RETURNS ingredients
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  v_caller UUID;
+  v_ing    ingredients%ROWTYPE;
+BEGIN
+  v_caller := current_tenant_id();
+  IF v_caller IS NULL THEN RAISE EXCEPTION 'Nimate pravice.'; END IF;
+
+  UPDATE ingredients
+     SET stock_quantity = stock_quantity + p_delta
+   WHERE id = p_ingredient_id AND tenant_id = v_caller
+  RETURNING * INTO v_ing;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Surovina ne obstaja.'; END IF;
+
+  INSERT INTO ingredient_movements (tenant_id, ingredient_id, delta, reason, note)
+  VALUES (v_caller, p_ingredient_id, p_delta, COALESCE(p_reason, 'intake'), p_note);
+
+  RETURN v_ing;
+END;
+$$;
+
+
+-- ============================================================================
+-- EPO.SI — Migration 005: Skupni in deljeni račun (obračun po postavkah)
+-- ----------------------------------------------------------------------------
+-- Run AFTER 002_invoices.sql. Idempotent.
+--
+-- Omogoča:
+--   - SKUPNI račun za mizo (vse neobračunane postavke vseh rund),
+--   - DELJENI / DELNI račun (natakar izbere posamezne postavke),
+--   brez dvojnega obračuna (order_items.invoice_id označi že obračunane).
+-- ============================================================================
+
+ALTER TABLE order_items
+  ADD COLUMN IF NOT EXISTS invoice_id UUID REFERENCES invoices(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_order_items_invoice ON order_items(invoice_id);
+
+-- ============================================================================
+-- RPC: issue_invoice_for_items — obračuna IZBRANE postavke (po id-jih) v en
+-- račun. Uporablja se za skupni (vse postavke mize) in deljeni (podmnožica)
+-- račun. Atomarno: dodeli zaporedno številko, izračuna DDV, posnetek, in
+-- označi postavke z invoice_id (da se ne obračunajo dvakrat).
+-- ============================================================================
+CREATE OR REPLACE FUNCTION issue_invoice_for_items(
+  p_item_ids       UUID[],
+  p_payment_method TEXT DEFAULT 'gotovina'
+) RETURNS invoices
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  v_caller    UUID;
+  v_tenant    tenants%ROWTYPE;
+  v_order_id  UUID;
+  v_table_id  UUID;
+  v_year      INT := EXTRACT(YEAR FROM now())::INT;
+  v_seq       INT;
+  v_number    TEXT;
+  v_op_name   TEXT;
+  v_net       NUMERIC(10,2);
+  v_vat       NUMERIC(10,2);
+  v_gross     NUMERIC(10,2);
+  v_breakdown JSONB;
+  v_items     JSONB;
+  v_count     INT;
+  v_inv       invoices%ROWTYPE;
+BEGIN
+  v_caller := current_tenant_id();
+  IF v_caller IS NULL THEN RAISE EXCEPTION 'Nimate pravice za izdajo računa.'; END IF;
+
+  -- Samo neobračunane postavke tega lokala.
+  SELECT COUNT(*) INTO v_count
+  FROM order_items
+  WHERE id = ANY(p_item_ids) AND tenant_id = v_caller AND invoice_id IS NULL;
+  IF v_count = 0 THEN RAISE EXCEPTION 'Ni neobračunanih postavk.'; END IF;
+
+  SELECT * INTO v_tenant FROM tenants WHERE id = v_caller;
+  SELECT full_name INTO v_op_name FROM profiles WHERE id = auth.uid();
+
+  -- Reprezentativno naročilo + miza (za povezavo na računu).
+  SELECT o.id, o.table_id INTO v_order_id, v_table_id
+  FROM order_items oi JOIN orders o ON o.id = oi.order_id
+  WHERE oi.id = ANY(p_item_ids) AND oi.tenant_id = v_caller AND oi.invoice_id IS NULL
+  LIMIT 1;
+
+  -- Postavke računa.
+  WITH lines AS (
+    SELECT oi.item_name AS name, oi.quantity AS qty, oi.item_price AS unit_price,
+           CASE WHEN v_tenant.vat_registered
+                THEN COALESCE(mi.vat_rate, v_tenant.default_vat_rate, 22) ELSE 0 END AS rate,
+           ROUND(oi.item_price * oi.quantity, 2) AS gross
+    FROM order_items oi
+    LEFT JOIN menu_items mi ON mi.id = oi.menu_item_id
+    WHERE oi.id = ANY(p_item_ids) AND oi.tenant_id = v_caller AND oi.invoice_id IS NULL
+  )
+  SELECT COALESCE(jsonb_agg(jsonb_build_object(
+           'name', name, 'qty', qty, 'unit_price', unit_price,
+           'vat_rate', rate, 'line_total', gross)), '[]'::jsonb)
+  INTO v_items FROM lines;
+
+  IF v_tenant.vat_registered THEN
+    WITH lines AS (
+      SELECT COALESCE(mi.vat_rate, v_tenant.default_vat_rate, 22) AS rate,
+             ROUND(oi.item_price * oi.quantity, 2) AS gross
+      FROM order_items oi
+      LEFT JOIN menu_items mi ON mi.id = oi.menu_item_id
+      WHERE oi.id = ANY(p_item_ids) AND oi.tenant_id = v_caller AND oi.invoice_id IS NULL
+    ),
+    grouped AS (
+      SELECT rate, SUM(gross) AS gross,
+             ROUND(SUM(gross) / (1 + rate/100.0), 2) AS base,
+             ROUND(SUM(gross) - SUM(gross) / (1 + rate/100.0), 2) AS vat
+      FROM lines GROUP BY rate
+    )
+    SELECT COALESCE(SUM(base),0), COALESCE(SUM(vat),0), COALESCE(SUM(gross),0),
+           COALESCE(jsonb_agg(jsonb_build_object('rate',rate,'base',base,'vat',vat) ORDER BY rate), '[]'::jsonb)
+    INTO v_net, v_vat, v_gross, v_breakdown FROM grouped;
+  ELSE
+    SELECT COALESCE(SUM(ROUND(oi.item_price*oi.quantity,2)),0)
+    INTO v_gross FROM order_items oi
+    WHERE oi.id = ANY(p_item_ids) AND oi.tenant_id = v_caller AND oi.invoice_id IS NULL;
+    v_net := v_gross; v_vat := 0; v_breakdown := '[]'::jsonb;
+  END IF;
+
+  -- Zaporedna številka.
+  INSERT INTO invoice_counters (tenant_id, premise_label, device_label, year, last_seq)
+  VALUES (v_caller, v_tenant.premise_label, v_tenant.device_label, v_year, 1)
+  ON CONFLICT (tenant_id, premise_label, device_label, year)
+  DO UPDATE SET last_seq = invoice_counters.last_seq + 1
+  RETURNING last_seq INTO v_seq;
+  v_number := v_tenant.premise_label || '-' || v_tenant.device_label || '-' || v_seq;
+
+  INSERT INTO invoices (
+    tenant_id, order_id, table_id, invoice_number, seq,
+    premise_label, device_label, operator_name, payment_method,
+    seller_name, seller_address, seller_tax_number, seller_vat_registered,
+    currency, net_total, vat_total, gross_total, vat_breakdown, items, is_fiscal
+  ) VALUES (
+    v_caller, v_order_id, v_table_id, v_number, v_seq,
+    v_tenant.premise_label, v_tenant.device_label, v_op_name, COALESCE(p_payment_method, 'gotovina'),
+    COALESCE(v_tenant.business_name, v_tenant.name), v_tenant.address, v_tenant.tax_number, v_tenant.vat_registered,
+    v_tenant.currency, v_net, v_vat, v_gross, v_breakdown, v_items, COALESCE(v_tenant.fiscal_enabled, false)
+  ) RETURNING * INTO v_inv;
+
+  -- Označi obračunane postavke.
+  UPDATE order_items
+     SET invoice_id = v_inv.id
+   WHERE id = ANY(p_item_ids) AND tenant_id = v_caller AND invoice_id IS NULL;
+
+  RETURN v_inv;
+END;
+$$;
+
+-- ============================================================================
+-- Posodobljen issue_invoice(order_id): obračuna VSE neobračunane postavke enega
+-- naročila prek issue_invoice_for_items (in s tem označi invoice_id). Če ni
+-- neobračunanih postavk, vrne zadnji obstoječi račun (idempotentno).
+-- ============================================================================
+CREATE OR REPLACE FUNCTION issue_invoice(
+  p_order_id       UUID,
+  p_payment_method TEXT DEFAULT 'gotovina'
+) RETURNS invoices
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  v_caller UUID;
+  v_ids    UUID[];
+  v_inv    invoices%ROWTYPE;
+BEGIN
+  v_caller := current_tenant_id();
+  IF v_caller IS NULL THEN RAISE EXCEPTION 'Nimate pravice za izdajo računa.'; END IF;
+
+  SELECT array_agg(id) INTO v_ids
+  FROM order_items
+  WHERE order_id = p_order_id AND tenant_id = v_caller AND invoice_id IS NULL;
+
+  IF v_ids IS NULL THEN
+    SELECT * INTO v_inv FROM invoices WHERE order_id = p_order_id ORDER BY created_at DESC LIMIT 1;
+    IF FOUND THEN RETURN v_inv; END IF;
+    RAISE EXCEPTION 'Ni postavk za obračun.';
+  END IF;
+
+  SELECT * INTO v_inv FROM issue_invoice_for_items(v_ids, p_payment_method);
+  RETURN v_inv;
+END;
+$$;

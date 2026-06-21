@@ -41,13 +41,36 @@
         <div class="field" style="flex:1"><label>Alergeni</label><input class="input" id="item-allergens" placeholder="npr. gluten, laktoza" /></div>
         <div class="field" style="width:160px"><label>Stopnja DDV (%)</label><input class="input" type="number" step="0.5" id="item-vat" placeholder="privzeto" /></div>
       </div>
-      <label class="switch" style="margin:4px 0 10px"><input type="checkbox" id="item-track-stock" /><span class="track"></span><span>Sledenje zalogi</span></label>
+      <label class="switch" style="margin:4px 0 10px"><input type="checkbox" id="item-track-stock" /><span class="track"></span><span>Sledenje zalogi (končni izdelek)</span></label>
       <div class="field" id="item-stock-field" style="display:none"><label>Zaloga (kos)</label><input class="input" type="number" id="item-stock" value="0" /></div>
+      <div class="field">
+        <label>Receptura — poraba sestavin na 1 kos</label>
+        <div id="item-recipe-rows"></div>
+        <button class="btn btn-sm" type="button" id="item-add-ingredient" style="margin-top:6px">＋ Dodaj sestavino</button>
+        <div class="muted" style="font-size:.78rem;margin-top:6px">Npr. Kava z mlekom: Kava 8 (g) + Mleko 10 (ml). Ob prodaji se samodejno odpiše iz zaloge surovin.</div>
+      </div>
       <div class="field"><label>Slika</label><input class="input" type="file" id="item-image" accept="image/*" /><div id="item-image-preview" class="muted" style="margin-top:6px"></div></div>
       <label class="switch"><input type="checkbox" id="item-available" checked /><span class="track"></span><span>Na voljo</span></label>
       <div class="modal-actions">
         <button class="btn" data-close="item-modal">Prekliči</button>
         <button class="btn btn-primary" id="item-save">Shrani</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ingredients / stock modal -->
+  <div class="modal-backdrop" id="ing-modal">
+    <div class="modal glass">
+      <div class="modal-head"><h2>📦 Surovine in zaloge</h2><button class="btn btn-ghost btn-icon" data-close="ing-modal">✕</button></div>
+      <div id="ing-list"></div>
+      <h3 style="margin:18px 0 8px">Nova surovina</h3>
+      <div class="row wrap" style="align-items:flex-end">
+        <div class="field" style="flex:1;margin:0"><label>Naziv</label><input class="input" id="ing-name" placeholder="npr. Kava" /></div>
+        <div class="field" style="width:110px;margin:0"><label>Enota</label>
+          <select class="select" id="ing-unit"><option>g</option><option>ml</option><option>kos</option><option>l</option><option>kg</option></select>
+        </div>
+        <div class="field" style="width:120px;margin:0"><label>Zaloga</label><input class="input" type="number" step="0.001" id="ing-stock" value="0" /></div>
+        <button class="btn btn-primary" id="ing-add">Dodaj</button>
       </div>
     </div>
   </div>

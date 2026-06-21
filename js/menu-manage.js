@@ -6,6 +6,8 @@
   let tenant = null;
   let categories = [];
   let items = [];
+  let ingredients = [];
+  let recipeRows = [];   // [{ ingredient_id, quantity }] za odprt item modal
   let editingCatId = null;
   let editingItemId = null;
 
@@ -14,22 +16,100 @@
     if (!ctx) return;
     tenant = ctx.tenant;
     document.getElementById('header-actions').innerHTML = `
+      <button class="btn btn-sm" id="open-ingredients">📦 Surovine</button>
       <button class="btn btn-sm" id="add-cat">＋ Kategorija</button>
       <button class="btn btn-primary btn-sm" id="add-item">＋ Izdelek</button>`;
+    document.getElementById('open-ingredients').addEventListener('click', openIngredients);
     document.getElementById('add-cat').addEventListener('click', () => openCatModal());
     document.getElementById('add-item').addEventListener('click', () => openItemModal());
+    document.getElementById('ing-add').addEventListener('click', addIngredient);
+    document.getElementById('item-add-ingredient').addEventListener('click', () => { recipeRows.push({ ingredient_id: '', quantity: 0 }); renderRecipeRows(); });
     wireModals();
     await load();
   }
 
   async function load() {
-    const [c, i] = await Promise.all([
+    const [c, i, ing] = await Promise.all([
       sb.from('categories').select('*').eq('tenant_id', tenant.id).order('sort_order'),
       sb.from('menu_items').select('*').eq('tenant_id', tenant.id).order('sort_order'),
+      sb.from('ingredients').select('*').eq('tenant_id', tenant.id).order('name'),
     ]);
     categories = c.data || [];
     items = i.data || [];
+    ingredients = ing.data || [];
     render();
+  }
+
+  // --- Surovine (ingredients) -----------------------------------------------
+  function openIngredients() { renderIngredients(); openModal('ing-modal'); }
+
+  function renderIngredients() {
+    const host = document.getElementById('ing-list');
+    if (!ingredients.length) { host.innerHTML = '<p class="muted">Ni surovin. Dodajte spodaj.</p>'; return; }
+    host.innerHTML = ingredients.map((g) => `
+      <div class="list-card" style="background:var(--surface)">
+        <div class="grow">
+          <div class="title">${esc(g.name)}</div>
+          <div class="sub">Zaloga: <strong>${(+g.stock_quantity).toLocaleString('sl-SI')}</strong> ${esc(g.unit)}</div>
+        </div>
+        <button class="btn btn-sm" data-ing-receive="${g.id}">📥 Prevzem</button>
+        <button class="btn btn-sm btn-danger" data-ing-del="${g.id}">🗑</button>
+      </div>`).join('');
+    host.querySelectorAll('[data-ing-receive]').forEach((b) => b.addEventListener('click', () => receiveIngredient(b.dataset.ingReceive)));
+    host.querySelectorAll('[data-ing-del]').forEach((b) => b.addEventListener('click', () => deleteIngredient(b.dataset.ingDel)));
+  }
+
+  async function addIngredient() {
+    const name = document.getElementById('ing-name').value.trim();
+    const unit = document.getElementById('ing-unit').value;
+    const stock = Number(document.getElementById('ing-stock').value) || 0;
+    if (!name) return toast('Vnesite naziv surovine.', 'error');
+    const { error } = await sb.from('ingredients').insert({ tenant_id: tenant.id, name, unit, stock_quantity: stock });
+    if (error) { console.error(error); return toast('Napaka pri dodajanju.', 'error'); }
+    document.getElementById('ing-name').value = '';
+    document.getElementById('ing-stock').value = '0';
+    await reloadIngredients(); renderIngredients(); toast('Surovina dodana.', 'success');
+  }
+
+  async function receiveIngredient(id) {
+    const g = ingredients.find((x) => x.id === id);
+    const v = prompt(`Prevzem surovine "${g.name}" (${g.unit}). Vnesite količino za dodajanje (negativno za odpis):`, '0');
+    if (v === null) return;
+    const delta = Number(v);
+    if (isNaN(delta) || delta === 0) return;
+    const { error } = await sb.rpc('receive_ingredient', { p_ingredient_id: id, p_delta: delta, p_reason: 'intake', p_note: null });
+    if (error) { console.error(error); return toast('Napaka pri prevzemu.', 'error'); }
+    await reloadIngredients(); renderIngredients(); toast('Zaloga posodobljena.', 'success');
+  }
+
+  async function deleteIngredient(id) {
+    if (!confirm('Izbrišem surovino? Odstrani se tudi iz vseh receptur.')) return;
+    const { error } = await sb.from('ingredients').delete().eq('id', id);
+    if (error) return toast('Napaka pri brisanju.', 'error');
+    await reloadIngredients(); renderIngredients(); toast('Izbrisano.', 'success');
+  }
+
+  async function reloadIngredients() {
+    const { data } = await sb.from('ingredients').select('*').eq('tenant_id', tenant.id).order('name');
+    ingredients = data || [];
+  }
+
+  // --- Receptura v item modalu ----------------------------------------------
+  function renderRecipeRows() {
+    const host = document.getElementById('item-recipe-rows');
+    if (!recipeRows.length) { host.innerHTML = '<p class="muted" style="font-size:.82rem;margin:0">Ni sestavin.</p>'; return; }
+    host.innerHTML = recipeRows.map((r, idx) => `
+      <div class="row" style="margin-bottom:6px">
+        <select class="select recipe-ing" data-idx="${idx}" style="flex:1">
+          <option value="">— izberi surovino —</option>
+          ${ingredients.map((g) => `<option value="${g.id}" ${g.id === r.ingredient_id ? 'selected' : ''}>${esc(g.name)} (${esc(g.unit)})</option>`).join('')}
+        </select>
+        <input class="input recipe-qty" data-idx="${idx}" type="number" step="0.001" value="${r.quantity}" style="width:110px" placeholder="količina" />
+        <button class="btn btn-sm btn-danger recipe-del" data-idx="${idx}" type="button">🗑</button>
+      </div>`).join('');
+    host.querySelectorAll('.recipe-ing').forEach((s) => s.addEventListener('change', (e) => { recipeRows[+e.target.dataset.idx].ingredient_id = e.target.value; }));
+    host.querySelectorAll('.recipe-qty').forEach((s) => s.addEventListener('input', (e) => { recipeRows[+e.target.dataset.idx].quantity = Number(e.target.value) || 0; }));
+    host.querySelectorAll('.recipe-del').forEach((b) => b.addEventListener('click', (e) => { recipeRows.splice(+e.target.dataset.idx, 1); renderRecipeRows(); }));
   }
 
   function render() {
@@ -192,7 +272,29 @@
     const sel = document.getElementById('item-category');
     sel.innerHTML = '<option value="">— brez kategorije —</option>' +
       categories.map((c) => `<option value="${c.id}" ${it && it.category_id === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
+
+    // Receptura: naloži obstoječe sestavine izdelka.
+    recipeRows = [];
+    renderRecipeRows();
+    if (id) {
+      sb.from('item_ingredients').select('ingredient_id, quantity').eq('menu_item_id', id).then(({ data }) => {
+        recipeRows = (data || []).map((r) => ({ ingredient_id: r.ingredient_id, quantity: Number(r.quantity) }));
+        renderRecipeRows();
+      });
+    }
     openModal('item-modal');
+  }
+
+  // Sinhronizira recepturo (item_ingredients) z vrsticami v modalu.
+  async function syncRecipe(itemId) {
+    await sb.from('item_ingredients').delete().eq('menu_item_id', itemId);
+    const rows = recipeRows
+      .filter((r) => r.ingredient_id && r.quantity > 0)
+      .map((r) => ({ tenant_id: tenant.id, menu_item_id: itemId, ingredient_id: r.ingredient_id, quantity: r.quantity }));
+    if (rows.length) {
+      const { error } = await sb.from('item_ingredients').insert(rows);
+      if (error) console.error(error);
+    }
   }
 
   async function uploadImage(file) {
@@ -230,10 +332,11 @@
       if (file) payload.image_url = await uploadImage(file);
 
       const q = editingItemId
-        ? sb.from('menu_items').update(payload).eq('id', editingItemId)
-        : sb.from('menu_items').insert(payload);
-      const { error } = await q;
+        ? sb.from('menu_items').update(payload).eq('id', editingItemId).select().single()
+        : sb.from('menu_items').insert(payload).select().single();
+      const { data: saved, error } = await q;
       if (error) throw error;
+      await syncRecipe(saved.id);
       closeModal('item-modal'); toast('Shranjeno.', 'success'); await load();
     } catch (err) {
       console.error(err); toast('Napaka pri shranjevanju.', 'error');

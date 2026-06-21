@@ -34,6 +34,13 @@ const Invoice = (() => {
     document.getElementById('invoice-modal').classList.add('open');
     loadOrIssue(order, tableLabel);
   }
+
+  // Račun na ravni MIZE: skupni (vse postavke) ali deljeni (izbrane postavke).
+  function openForTable(tableId, tableLabel) {
+    ensureModal();
+    document.getElementById('invoice-modal').classList.add('open');
+    loadTableBilling(tableId, tableLabel);
+  }
   function close() {
     const m = document.getElementById('invoice-modal');
     if (m) m.classList.remove('open');
@@ -79,6 +86,125 @@ const Invoice = (() => {
       const inv = Array.isArray(data) ? data[0] : data;
       showReceipt(inv, tableLabel);
     });
+  }
+
+  // --- Obračun mize: izbira postavk (skupni / deljeni) ----------------------
+  async function loadTableBilling(tableId, tableLabel) {
+    const body = document.getElementById('inv-body');
+    body.innerHTML = '<div class="spinner"></div>';
+
+    // Neobračunane postavke vseh aktivnih (nepreklicanih) naročil te mize.
+    const { data: rawItems, error } = await sb.from('order_items')
+      .select('id, item_name, item_price, quantity, order_id, orders!inner(table_id, status, created_at)')
+      .is('invoice_id', null)
+      .eq('orders.table_id', tableId)
+      .neq('orders.status', 'cancelled');
+    if (error) { console.error(error); body.innerHTML = '<p class="muted">Napaka pri nalaganju.</p>'; return; }
+
+    // Že izdani računi te mize (za ponovni tisk).
+    const { data: invs } = await sb.from('invoices').select('*')
+      .eq('table_id', tableId).order('created_at', { ascending: false });
+
+    const items = rawItems || [];
+    renderTableBilling(tableId, tableLabel, items, invs || []);
+  }
+
+  function renderTableBilling(tableId, tableLabel, items, invs) {
+    const body = document.getElementById('inv-body');
+    const cur = (window.AdminShell && AdminShell.tenant && AdminShell.tenant.currency) || '€';
+
+    const lines = items.map((it) => `
+      <label class="bill-line">
+        <input type="checkbox" class="bill-cb" value="${it.id}" data-total="${(it.item_price * it.quantity).toFixed(2)}" checked />
+        <span class="bill-qty">${it.quantity}×</span>
+        <span class="bill-name">${esc(it.item_name)}</span>
+        <span class="bill-amt">${formatPrice(it.item_price * it.quantity, cur)}</span>
+      </label>`).join('');
+
+    const invList = invs.length ? `
+      <div class="bill-section">
+        <h3>Izdani računi mize</h3>
+        ${invs.map((v) => `
+          <div class="row" style="padding:6px 0;border-bottom:1px solid var(--glass-border)">
+            <span><strong>${esc(v.invoice_number)}</strong> · ${formatPrice(v.gross_total, cur)}
+              <span class="muted">(${esc(payLabel(v.payment_method))})</span></span>
+            <button class="btn btn-sm" data-reprint="${v.id}" style="margin-left:auto">🖨 Ponovni tisk</button>
+          </div>`).join('')}
+      </div>` : '';
+
+    body.innerHTML = `
+      <p class="muted">Miza <strong>${esc(tableLabel || '')}</strong> — izberite postavke za obračun
+        (vse = skupni račun, izbrane = deljeni račun).</p>
+      ${items.length ? `
+        <div class="row" style="margin-bottom:8px">
+          <button class="btn btn-sm" id="bill-all">Izberi vse</button>
+          <button class="btn btn-sm" id="bill-none">Počisti</button>
+          <span class="spacer"></span>
+          <strong id="bill-sum">${formatPrice(items.reduce((s, i) => s + i.item_price * i.quantity, 0), cur)}</strong>
+        </div>
+        <div class="bill-list">${lines}</div>
+        <div class="field" style="margin-top:12px">
+          <label>Način plačila</label>
+          <select class="select" id="inv-pay">
+            <option value="gotovina">Gotovina</option>
+            <option value="kartica">Kartica</option>
+            <option value="drugo">Drugo</option>
+          </select>
+        </div>
+        <label class="switch" style="margin:4px 0 12px"><input type="checkbox" id="bill-close" checked /><span class="track"></span><span>Ob plačilu vsega zapri mizo</span></label>
+        <button class="btn btn-primary btn-block" id="bill-issue">Obračunaj izbrano</button>
+      ` : '<div class="empty-state"><div class="emoji">✅</div><p>Ni neobračunanih postavk za to mizo.</p></div>'}
+      ${invList}`;
+
+    if (items.length) {
+      const cbs = () => Array.from(body.querySelectorAll('.bill-cb'));
+      const recalc = () => {
+        const sum = cbs().filter((c) => c.checked).reduce((s, c) => s + Number(c.dataset.total), 0);
+        document.getElementById('bill-sum').textContent = formatPrice(sum, cur);
+      };
+      body.querySelectorAll('.bill-cb').forEach((c) => c.addEventListener('change', recalc));
+      document.getElementById('bill-all').addEventListener('click', () => { cbs().forEach((c) => c.checked = true); recalc(); });
+      document.getElementById('bill-none').addEventListener('click', () => { cbs().forEach((c) => c.checked = false); recalc(); });
+      document.getElementById('bill-issue').addEventListener('click', () => issueSelected(tableId, tableLabel));
+    }
+    body.querySelectorAll('[data-reprint]').forEach((b) =>
+      b.addEventListener('click', () => {
+        const v = invs.find((x) => x.id === b.dataset.reprint);
+        if (v) showReceipt(v, tableLabel);
+      }));
+  }
+
+  async function issueSelected(tableId, tableLabel) {
+    const ids = Array.from(document.querySelectorAll('.bill-cb')).filter((c) => c.checked).map((c) => c.value);
+    if (!ids.length) { toast('Izberite vsaj eno postavko.', 'error'); return; }
+    const closeTable = document.getElementById('bill-close')?.checked;
+    const btn = document.getElementById('bill-issue');
+    btn.disabled = true; btn.textContent = 'Obračunavam…';
+    const { data, error } = await sb.rpc('issue_invoice_for_items', {
+      p_item_ids: ids,
+      p_payment_method: document.getElementById('inv-pay').value,
+    });
+    if (error) {
+      console.error(error);
+      toast('Napaka pri obračunu: ' + (error.message || ''), 'error', 6000);
+      btn.disabled = false; btn.textContent = 'Obračunaj izbrano';
+      return;
+    }
+    const inv = Array.isArray(data) ? data[0] : data;
+
+    // Če po obračunu ni več neobračunanih postavk in je izbrano "zapri mizo",
+    // označi aktivna naročila mize kot postrežena (miza se zapre).
+    const { count } = await sb.from('order_items')
+      .select('id, orders!inner(table_id, status)', { count: 'exact', head: true })
+      .is('invoice_id', null)
+      .eq('orders.table_id', tableId)
+      .neq('orders.status', 'cancelled');
+    if (closeTable && (count === 0 || count === null)) {
+      await sb.from('orders').update({ status: 'served' })
+        .eq('table_id', tableId).in('status', ['new', 'preparing']);
+      toast('Miza zaprta.', 'success');
+    }
+    showReceipt(inv, tableLabel);
   }
 
   async function showReceipt(inv, tableLabel) {
@@ -257,7 +383,7 @@ const Invoice = (() => {
     .rcpt-foot { text-align:center; margin-top:12px; font-size:12px; }
   `;
 
-  return { open, close };
+  return { open, openForTable, close };
 })();
 
 window.Invoice = Invoice;

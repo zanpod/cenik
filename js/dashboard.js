@@ -174,7 +174,6 @@
             ${o.status === 'new' ? `<button class="btn btn-warning btn-sm" data-act="preparing" data-id="${o.id}">V pripravo</button>` : ''}
             ${o.status === 'preparing' ? `<button class="btn btn-success btn-sm" data-act="served" data-id="${o.id}">Postreženo</button>` : ''}
             <button class="btn btn-danger btn-sm" data-act="cancelled" data-id="${o.id}">Prekliči</button>
-            <button class="btn btn-sm" data-invoice="${o.id}">🧾 Račun</button>
           </div>
         </div>`).join('');
       return `
@@ -186,6 +185,7 @@
             <span class="order-total" style="margin-left:auto">${formatPrice(tableTotal, tenant.currency)}</span>
           </div>
           ${rounds}
+          <button class="btn btn-primary btn-block" data-table-bill="${tid}" data-label="${esc(label)}">🧾 Račun / zapri mizo</button>
         </div>`;
     }).join('');
     wireOrderActions();
@@ -251,6 +251,9 @@
         const label = table ? (table.label || `Miza ${table.table_number}`) : '';
         Invoice.open({ id: btn.dataset.invoice }, label);
       });
+    });
+    document.querySelectorAll('[data-table-bill]').forEach((btn) => {
+      btn.addEventListener('click', () => Invoice.openForTable(btn.dataset.tableBill, btn.dataset.label));
     });
     document.querySelectorAll('[data-act]').forEach((btn) => {
       btn.addEventListener('click', async () => {
