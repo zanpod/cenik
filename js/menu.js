@@ -152,8 +152,12 @@
   }
 
   function renderItemCard(item) {
+    // Sold out when stock tracking is on and stock is depleted.
+    const soldOut = item.track_stock && item.stock_quantity <= 0;
+    const orderable = item.is_available && !soldOut;
+
     const card = document.createElement('div');
-    card.className = 'menu-item glass' + (item.is_available ? '' : ' unavailable');
+    card.className = 'menu-item glass' + (orderable ? '' : ' unavailable');
     card.dataset.id = item.id;
 
     const thumb = item.image_url
@@ -161,7 +165,7 @@
       : `<div class="item-thumb placeholder">🍽️</div>`;
 
     const qty = Cart.quantityOf(item.id);
-    const controls = item.is_available ? `
+    const controls = orderable ? `
       <div class="stepper${qty > 0 ? ' has-qty' : ''}" data-id="${item.id}">
         <button class="step-btn add add-only" aria-label="Dodaj">＋</button>
         <div class="qty-controls">
@@ -169,7 +173,7 @@
           <span class="step-qty">${qty}</span>
           <button class="step-btn add plus" aria-label="Dodaj">＋</button>
         </div>
-      </div>` : '<span class="na-badge">Ni na voljo</span>';
+      </div>` : `<span class="na-badge">${soldOut ? 'Razprodano' : 'Ni na voljo'}</span>`;
 
     card.innerHTML = `
       ${thumb}
@@ -183,9 +187,16 @@
         </div>
       </div>`;
 
-    if (item.is_available) {
+    if (orderable) {
       const stepper = card.querySelector('.stepper');
-      const addItem = () => { Cart.add(item); pulse(card); };
+      const addItem = () => {
+        // Do not let a customer order more than the available stock.
+        if (item.track_stock && Cart.quantityOf(item.id) + 1 > item.stock_quantity) {
+          toast(`Na voljo le še ${item.stock_quantity} kos.`, 'error');
+          return;
+        }
+        Cart.add(item); pulse(card);
+      };
       card.querySelector('.add-only').addEventListener('click', addItem);
       card.querySelector('.plus').addEventListener('click', addItem);
       card.querySelector('.minus').addEventListener('click', () => Cart.remove(item.id));

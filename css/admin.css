@@ -132,6 +132,17 @@
 .order-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .order-actions .btn { flex: 1; }
 
+/* --- By-table grouped view -------------------------------------------------*/
+.table-group { padding: 16px; margin-bottom: 16px; display: flex; flex-direction: column; gap: 12px; }
+.table-group .order-card-head { padding-bottom: 10px; border-bottom: 1px solid var(--glass-border); }
+.table-round { background: var(--surface); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.round-head { display: flex; align-items: center; gap: 10px; }
+.round-label { font-weight: 800; color: var(--brand-primary); }
+@media (min-width: 861px) {
+  #orders-host:has(.table-group) { columns: 2; column-gap: 16px; }
+  .table-group { break-inside: avoid; }
+}
+
 /* --- Tables / cards generic ------------------------------------------------*/
 .card { padding: 18px; }
 .list-card { padding: 16px; display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }

@@ -13,6 +13,7 @@
   const FILTERS = [
     { key: 'new',       label: 'Nova naročila' },
     { key: 'preparing', label: 'V pripravi' },
+    { key: 'tables',    label: 'Po mizah' },
     { key: 'served',    label: 'Postrežena' },
     { key: 'today',     label: 'Vsa danes' },
   ];
@@ -36,6 +37,7 @@
 
   function renderHeaderActions() {
     document.getElementById('header-actions').innerHTML = `
+      <a class="btn btn-primary btn-sm" href="/admin/new-order.html">➕ Novo naročilo</a>
       <button class="btn btn-sm" id="sound-toggle"></button>
       <button class="btn btn-sm" id="refresh-btn">🔄 Osveži</button>`;
     updateSoundBtn();
@@ -103,9 +105,11 @@
 
   function updateCounts() {
     const start = new Date(); start.setHours(0, 0, 0, 0);
+    const active = orders.filter((o) => o.status === 'new' || o.status === 'preparing');
     const counts = {
       new: orders.filter((o) => o.status === 'new').length,
       preparing: orders.filter((o) => o.status === 'preparing').length,
+      tables: new Set(active.map((o) => o.table_id)).size,
       served: orders.filter((o) => o.status === 'served').length,
       today: orders.filter((o) => new Date(o.created_at) >= start).length,
     };
@@ -119,6 +123,7 @@
   }
 
   function renderOrders(flashId) {
+    if (activeFilter === 'tables') { renderByTable(flashId); return; }
     const host = document.getElementById('orders-host');
     const list = filteredOrders();
     if (!list.length) {
@@ -130,6 +135,64 @@
     if (flashId) {
       const card = host.querySelector(`[data-order="${flashId}"]`);
       if (card) card.classList.add('flash');
+    }
+  }
+
+  // Grouped view: all active (new + preparing) orders per table, several rounds
+  // shown together and refreshed live as more arrive (QR or staff).
+  function renderByTable(flashId) {
+    const host = document.getElementById('orders-host');
+    const active = orders.filter((o) => o.status === 'new' || o.status === 'preparing');
+    if (!active.length) {
+      host.innerHTML = '<div class="empty-state"><div class="emoji">🎉</div><p>Ni odprtih miz.</p></div>';
+      return;
+    }
+    // Group by table_id, preserving table order.
+    const groups = {};
+    active.forEach((o) => { (groups[o.table_id] ||= []).push(o); });
+    const tableIds = Object.keys(groups).sort((a, b) =>
+      (tablesById[a]?.table_number || 0) - (tablesById[b]?.table_number || 0));
+
+    host.innerHTML = tableIds.map((tid) => {
+      const list = groups[tid].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+      const t = tablesById[tid];
+      const label = t ? (t.label || `Miza ${t.table_number}`) : 'Miza ?';
+      const tnum = t ? t.table_number : '?';
+      const tableTotal = list.reduce((s, o) => s + Number(o.total || 0), 0);
+      const rounds = list.map((o, i) => `
+        <div class="table-round">
+          <div class="round-head">
+            <span class="round-label">Runda ${i + 1}</span>
+            <span class="muted" data-time="${o.created_at}">${timeAgo(o.created_at)}</span>
+            <span class="badge badge-${o.status}">${STATUS_LABELS[o.status]}</span>
+          </div>
+          <div class="order-items-list">${o.items.map((it) => `
+            <div class="order-item-row"><span class="order-item-qty">${it.quantity}×</span>
+            <span class="order-item-name">${esc(it.item_name)}${it.notes ? `<div class="order-item-note">↳ ${esc(it.notes)}</div>` : ''}</span></div>`).join('')}</div>
+          ${o.notes ? `<div class="order-note-box">📝 ${esc(o.notes)}</div>` : ''}
+          <div class="order-actions">
+            ${o.status === 'new' ? `<button class="btn btn-warning btn-sm" data-act="preparing" data-id="${o.id}">V pripravo</button>` : ''}
+            ${o.status === 'preparing' ? `<button class="btn btn-success btn-sm" data-act="served" data-id="${o.id}">Postreženo</button>` : ''}
+            <button class="btn btn-danger btn-sm" data-act="cancelled" data-id="${o.id}">Prekliči</button>
+            <button class="btn btn-sm" data-invoice="${o.id}">🧾 Račun</button>
+          </div>
+        </div>`).join('');
+      return `
+        <div class="table-group glass" data-table="${tid}">
+          <div class="order-card-head">
+            <div class="order-table-num">${esc(String(tnum))}</div>
+            <div class="order-meta"><strong>${esc(label)}</strong>
+              <span class="muted">${list.length} ${list.length === 1 ? 'runda' : 'rund'}</span></div>
+            <span class="order-total" style="margin-left:auto">${formatPrice(tableTotal, tenant.currency)}</span>
+          </div>
+          ${rounds}
+        </div>`;
+    }).join('');
+    wireOrderActions();
+    if (flashId) {
+      const o = orders.find((x) => x.id === flashId);
+      const g = o && host.querySelector(`[data-table="${o.table_id}"]`);
+      if (g) g.classList.add('flash');
     }
   }
 

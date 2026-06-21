@@ -41,6 +41,8 @@
         <div class="field" style="flex:1"><label>Alergeni</label><input class="input" id="item-allergens" placeholder="npr. gluten, laktoza" /></div>
         <div class="field" style="width:160px"><label>Stopnja DDV (%)</label><input class="input" type="number" step="0.5" id="item-vat" placeholder="privzeto" /></div>
       </div>
+      <label class="switch" style="margin:4px 0 10px"><input type="checkbox" id="item-track-stock" /><span class="track"></span><span>Sledenje zalogi</span></label>
+      <div class="field" id="item-stock-field" style="display:none"><label>Zaloga (kos)</label><input class="input" type="number" id="item-stock" value="0" /></div>
       <div class="field"><label>Slika</label><input class="input" type="file" id="item-image" accept="image/*" /><div id="item-image-preview" class="muted" style="margin-top:6px"></div></div>
       <label class="switch"><input type="checkbox" id="item-available" checked /><span class="track"></span><span>Na voljo</span></label>
       <div class="modal-actions">

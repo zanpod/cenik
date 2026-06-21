@@ -5,6 +5,7 @@
 
 const NAV = [
   { href: '/admin/dashboard.html', icon: '📋', label: 'Naročila', key: 'dashboard', badge: true },
+  { href: '/admin/new-order.html', icon: '➕', label: 'Novo',     key: 'neworder' },
   { href: '/admin/menu.html',      icon: '🍽️', label: 'Meni',     key: 'menu' },
   { href: '/admin/tables.html',    icon: '🪑', label: 'Mize',     key: 'tables' },
   { href: '/admin/orders.html',    icon: '🧾', label: 'Zgodovina', key: 'orders' },

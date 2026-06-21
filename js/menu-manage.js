@@ -66,15 +66,22 @@
     wireRows();
   }
 
+  function stockTag(it) {
+    if (!it.track_stock) return '';
+    const low = it.stock_quantity <= 0;
+    return ` <span class="badge ${low ? 'badge-cancelled' : 'badge-served'}">Zaloga: ${it.stock_quantity}</span>`;
+  }
+
   function itemRow(it, idx, total) {
     return `
       <div class="list-card" style="margin:10px 0 0; background:var(--surface)">
         ${it.image_url ? `<img src="${esc(it.image_url)}" style="width:48px;height:48px;border-radius:8px;object-fit:cover" />`
           : '<div style="width:48px;height:48px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:var(--surface-2)">🍽️</div>'}
         <div class="grow">
-          <div class="title">${esc(it.name)} ${it.is_available ? '' : '<span class="badge badge-cancelled">Ni na voljo</span>'}</div>
+          <div class="title">${esc(it.name)} ${it.is_available ? '' : '<span class="badge badge-cancelled">Ni na voljo</span>'}${stockTag(it)}</div>
           <div class="sub">${formatPrice(it.price, tenant.currency)}${it.description ? ' · ' + esc(it.description) : ''}</div>
         </div>
+        ${it.track_stock ? `<button class="btn btn-sm" data-restock="${it.id}" title="Dopolni zalogo">📦 +</button>` : ''}
         <label class="switch" title="Na voljo">
           <input type="checkbox" data-avail="${it.id}" ${it.is_available ? 'checked' : ''}/>
           <span class="track"></span>
@@ -97,6 +104,21 @@
     host.querySelectorAll('[data-item-up]').forEach((b) => b.addEventListener('click', () => moveItem(b.dataset.itemUp, -1)));
     host.querySelectorAll('[data-item-down]').forEach((b) => b.addEventListener('click', () => moveItem(b.dataset.itemDown, 1)));
     host.querySelectorAll('[data-avail]').forEach((c) => c.addEventListener('change', () => toggleAvail(c.dataset.avail, c.checked)));
+    host.querySelectorAll('[data-restock]').forEach((b) => b.addEventListener('click', () => restock(b.dataset.restock)));
+  }
+
+  async function restock(id) {
+    const it = items.find((x) => x.id === id);
+    const add = prompt(`Dodaj zalogo za "${it.name}" (trenutno: ${it.stock_quantity}). Vnesite število kosov za dodajanje (negativno za odvzem):`, '10');
+    if (add === null) return;
+    const delta = parseInt(add, 10);
+    if (isNaN(delta)) return toast('Neveljavno število.', 'error');
+    const next = (it.stock_quantity || 0) + delta;
+    const { error } = await sb.from('menu_items').update({ stock_quantity: next }).eq('id', id);
+    if (error) return toast('Napaka pri posodobitvi zaloge.', 'error');
+    it.stock_quantity = next;
+    toast(`Nova zaloga: ${next}`, 'success');
+    render();
   }
 
   // --- Categories -----------------------------------------------------------
@@ -161,6 +183,12 @@
     document.getElementById('item-available').checked = it ? it.is_available : true;
     document.getElementById('item-image').value = '';
     document.getElementById('item-image-preview').textContent = it?.image_url ? 'Trenutna slika je nastavljena.' : '';
+    const trackEl = document.getElementById('item-track-stock');
+    const stockField = document.getElementById('item-stock-field');
+    trackEl.checked = !!it?.track_stock;
+    document.getElementById('item-stock').value = it?.stock_quantity ?? 0;
+    stockField.style.display = trackEl.checked ? '' : 'none';
+    trackEl.onchange = () => { stockField.style.display = trackEl.checked ? '' : 'none'; };
     const sel = document.getElementById('item-category');
     sel.innerHTML = '<option value="">— brez kategorije —</option>' +
       categories.map((c) => `<option value="${c.id}" ${it && it.category_id === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
@@ -195,6 +223,8 @@
         allergens: document.getElementById('item-allergens').value.trim() || null,
         vat_rate: document.getElementById('item-vat').value === '' ? null : Number(document.getElementById('item-vat').value),
         is_available: document.getElementById('item-available').checked,
+        track_stock: document.getElementById('item-track-stock').checked,
+        stock_quantity: Number(document.getElementById('item-stock').value) || 0,
       };
       const file = document.getElementById('item-image').files[0];
       if (file) payload.image_url = await uploadImage(file);
