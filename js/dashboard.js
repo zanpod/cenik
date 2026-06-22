@@ -11,9 +11,8 @@
   let timeTimer = null;
 
   const FILTERS = [
-    { key: 'new',       label: 'Nova naročila' },
-    { key: 'preparing', label: 'V pripravi' },
     { key: 'tables',    label: 'Po mizah' },
+    { key: 'new',       label: 'Nova naročila' },
     { key: 'served',    label: 'Postrežena' },
     { key: 'today',     label: 'Vsa danes' },
   ];
@@ -30,6 +29,8 @@
     await loadOrders();
     subscribeRealtime();
     requestNotifyPermission();
+    // Po izdaji računa (postavke dobijo invoice_id — realtime tega ne sproži).
+    window.addEventListener('epo:invoiced', loadOrders);
 
     // Refresh "time ago" labels every 30s.
     timeTimer = setInterval(updateTimes, 30000);
@@ -103,13 +104,17 @@
     return orders.filter((o) => o.status === activeFilter);
   }
 
+  // Postavka je plačana, ko ima invoice_id; naročilo je "odprto", dokler ima
+  // vsaj eno neplačano postavko (ne glede na status).
+  function unbilledItems(o) { return (o.items || []).filter((it) => !it.invoice_id); }
+  function isOpen(o) { return o.status !== 'cancelled' && unbilledItems(o).length > 0; }
+
   function updateCounts() {
     const start = new Date(); start.setHours(0, 0, 0, 0);
-    const active = orders.filter((o) => o.status === 'new' || o.status === 'preparing');
+    const open = orders.filter(isOpen);
     const counts = {
+      tables: new Set(open.map((o) => o.table_id)).size,
       new: orders.filter((o) => o.status === 'new').length,
-      preparing: orders.filter((o) => o.status === 'preparing').length,
-      tables: new Set(active.map((o) => o.table_id)).size,
       served: orders.filter((o) => o.status === 'served').length,
       today: orders.filter((o) => new Date(o.created_at) >= start).length,
     };
@@ -138,18 +143,17 @@
     }
   }
 
-  // Grouped view: all active (new + preparing) orders per table, several rounds
-  // shown together and refreshed live as more arrive (QR or staff).
+  // Grouped view: tables stay OPEN until fully paid (driven by unpaid items),
+  // regardless of round status. "Postreženo" is just a serving marker.
   function renderByTable(flashId) {
     const host = document.getElementById('orders-host');
-    const active = orders.filter((o) => o.status === 'new' || o.status === 'preparing');
-    if (!active.length) {
+    const open = orders.filter(isOpen);
+    if (!open.length) {
       host.innerHTML = '<div class="empty-state"><div class="emoji">🎉</div><p>Ni odprtih miz.</p></div>';
       return;
     }
-    // Group by table_id, preserving table order.
     const groups = {};
-    active.forEach((o) => { (groups[o.table_id] ||= []).push(o); });
+    open.forEach((o) => { (groups[o.table_id] ||= []).push(o); });
     const tableIds = Object.keys(groups).sort((a, b) =>
       (tablesById[a]?.table_number || 0) - (tablesById[b]?.table_number || 0));
 
@@ -158,7 +162,10 @@
       const t = tablesById[tid];
       const label = t ? (t.label || `Miza ${t.table_number}`) : 'Miza ?';
       const tnum = t ? t.table_number : '?';
-      const tableTotal = list.reduce((s, o) => s + Number(o.total || 0), 0);
+      // Za plačilo = vsota neplačanih postavk.
+      const remaining = list.reduce((s, o) =>
+        s + unbilledItems(o).reduce((x, it) => x + Number(it.item_price) * it.quantity, 0), 0);
+
       const rounds = list.map((o, i) => `
         <div class="table-round">
           <div class="round-head">
@@ -167,22 +174,25 @@
             <span class="badge badge-${o.status}">${STATUS_LABELS[o.status]}</span>
           </div>
           <div class="order-items-list">${o.items.map((it) => `
-            <div class="order-item-row"><span class="order-item-qty">${it.quantity}×</span>
-            <span class="order-item-name">${esc(it.item_name)}${it.notes ? `<div class="order-item-note">↳ ${esc(it.notes)}</div>` : ''}</span></div>`).join('')}</div>
+            <div class="order-item-row ${it.invoice_id ? 'item-paid' : ''}">
+              <span class="order-item-qty">${it.quantity}×</span>
+              <span class="order-item-name">${esc(it.item_name)}${it.invoice_id ? ' <span class="badge badge-served">plačano</span>' : ''}${it.notes ? `<div class="order-item-note">↳ ${esc(it.notes)}</div>` : ''}</span>
+            </div>`).join('')}</div>
           ${o.notes ? `<div class="order-note-box">📝 ${esc(o.notes)}</div>` : ''}
           <div class="order-actions">
-            ${o.status === 'new' ? `<button class="btn btn-warning btn-sm" data-act="preparing" data-id="${o.id}">V pripravo</button>` : ''}
-            ${o.status === 'preparing' ? `<button class="btn btn-success btn-sm" data-act="served" data-id="${o.id}">Postreženo</button>` : ''}
+            ${o.status === 'new' ? `<button class="btn btn-success btn-sm" data-act="served" data-id="${o.id}">Postreženo</button>` : ''}
+            ${o.status === 'served' ? `<button class="btn btn-sm" data-act="new" data-id="${o.id}">↩ Nazaj na novo</button>` : ''}
             <button class="btn btn-danger btn-sm" data-act="cancelled" data-id="${o.id}">Prekliči</button>
           </div>
         </div>`).join('');
+
       return `
         <div class="table-group glass" data-table="${tid}">
           <div class="order-card-head">
             <div class="order-table-num">${esc(String(tnum))}</div>
             <div class="order-meta"><strong>${esc(label)}</strong>
               <span class="muted">${list.length} ${list.length === 1 ? 'runda' : 'rund'}</span></div>
-            <span class="order-total" style="margin-left:auto">${formatPrice(tableTotal, tenant.currency)}</span>
+            <span class="order-total" style="margin-left:auto">za plačilo: ${formatPrice(remaining, tenant.currency)}</span>
           </div>
           ${rounds}
           <button class="btn btn-primary btn-block" data-table-bill="${tid}" data-label="${esc(label)}">🧾 Račun / zapri mizo</button>
@@ -209,14 +219,10 @@
     let actions = '';
     if (o.status === 'new') {
       actions = `
-        <button class="btn btn-warning btn-sm" data-act="preparing" data-id="${o.id}">V pripravo</button>
-        <button class="btn btn-danger btn-sm" data-act="cancelled" data-id="${o.id}">Prekliči</button>`;
-    } else if (o.status === 'preparing') {
-      actions = `
         <button class="btn btn-success btn-sm" data-act="served" data-id="${o.id}">Postreženo</button>
         <button class="btn btn-danger btn-sm" data-act="cancelled" data-id="${o.id}">Prekliči</button>`;
     } else if (o.status === 'served') {
-      actions = `<button class="btn btn-sm" data-act="preparing" data-id="${o.id}">↩ V pripravo</button>`;
+      actions = `<button class="btn btn-sm" data-act="new" data-id="${o.id}">↩ Nazaj na novo</button>`;
     }
     // Invoice button for any non-cancelled order.
     if (o.status !== 'cancelled') {

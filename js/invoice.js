@@ -84,6 +84,7 @@ const Invoice = (() => {
       }
       // rpc returns the row (array or object depending on PostgREST)
       const inv = Array.isArray(data) ? data[0] : data;
+      window.dispatchEvent(new CustomEvent('epo:invoiced'));
       showReceipt(inv, tableLabel);
     });
   }
@@ -157,7 +158,7 @@ const Invoice = (() => {
             <option value="drugo">Drugo</option>
           </select>
         </div>
-        <label class="switch" style="margin:4px 0 12px"><input type="checkbox" id="bill-close" checked /><span class="track"></span><span>Ob plačilu vsega zapri mizo</span></label>
+        <div class="muted" style="font-size:.8rem;margin:4px 0 12px">Plačane postavke se obračunajo; ko je plačano vse, se miza zapre (gre v »postreženo«).</div>
         <button class="btn btn-primary btn-block" id="bill-issue">Obračunaj izbrano</button>
       ` : '<div class="empty-state"><div class="emoji">✅</div><p>Ni neobračunanih postavk za to mizo.</p></div>'}
       ${invList}`;
@@ -183,7 +184,6 @@ const Invoice = (() => {
   async function issueSelected(tableId, tableLabel) {
     const ids = Array.from(document.querySelectorAll('.bill-cb')).filter((c) => c.checked).map((c) => c.value);
     if (!ids.length) { toast('Izberite vsaj eno postavko.', 'error'); return; }
-    const closeTable = document.getElementById('bill-close')?.checked;
     const btn = document.getElementById('bill-issue');
     btn.disabled = true; btn.textContent = 'Obračunavam…';
     const { data, error } = await sb.rpc('issue_invoice_for_items', {
@@ -198,18 +198,19 @@ const Invoice = (() => {
     }
     const inv = Array.isArray(data) ? data[0] : data;
 
-    // Če po obračunu ni več neobračunanih postavk in je izbrano "zapri mizo",
-    // označi aktivna naročila mize kot postrežena (miza se zapre).
-    const { count } = await sb.from('order_items')
-      .select('id, orders!inner(table_id, status)', { count: 'exact', head: true })
-      .is('invoice_id', null)
-      .eq('orders.table_id', tableId)
-      .neq('orders.status', 'cancelled');
-    if (closeTable && (count === 0 || count === null)) {
-      await sb.from('orders').update({ status: 'served' })
-        .eq('table_id', tableId).in('status', ['new', 'preparing']);
-      toast('Miza zaprta.', 'success');
+    // Po obračunu: naročila te mize, ki so v CELOTI plačana, gredo v "postreženo"
+    // (miza/runda se zaključi). Delno plačane ostanejo odprte.
+    const { data: tOrders } = await sb.from('orders')
+      .select('id, status, order_items(invoice_id)')
+      .eq('table_id', tableId).neq('status', 'cancelled');
+    const fullyPaid = (tOrders || []).filter((o) =>
+      o.status !== 'served' && (o.order_items || []).length > 0 && o.order_items.every((i) => i.invoice_id));
+    if (fullyPaid.length) {
+      await sb.from('orders').update({ status: 'served' }).in('id', fullyPaid.map((o) => o.id));
     }
+    const stillOpen = (tOrders || []).some((o) => (o.order_items || []).some((i) => !i.invoice_id));
+    toast(stillOpen ? 'Račun izdan. Miza ostaja odprta.' : 'Račun izdan. Miza zaprta.', 'success');
+    window.dispatchEvent(new CustomEvent('epo:invoiced'));
     showReceipt(inv, tableLabel);
   }
 
