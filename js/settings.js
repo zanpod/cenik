@@ -96,7 +96,7 @@
       tenant.fiscal_enabled = enabled;
       toast(enabled ? 'Davčno potrjevanje vklopljeno.' : 'Davčno potrjevanje izklopljeno.', 'success');
     } catch (err) {
-      console.error(err); toast('Napaka pri shranjevanju.', 'error');
+      console.error(err); toast('Napaka: ' + (err.message || err.error_description || err), 'error', 7000);
     } finally {
       btn.disabled = false; btn.textContent = 'Shrani';
     }
@@ -139,7 +139,7 @@
       tenant = { ...tenant, ...payload };
       toast('Podatki za račune shranjeni.', 'success');
     } catch (err) {
-      console.error(err); toast('Napaka pri shranjevanju.', 'error');
+      console.error(err); toast('Napaka: ' + (err.message || err.error_description || err), 'error', 7000);
     } finally {
       btn.disabled = false; btn.textContent = 'Shrani podatke za račune';
     }
@@ -175,7 +175,7 @@
       applyBranding(tenant);
       toast('Nastavitve shranjene.', 'success');
     } catch (err) {
-      console.error(err); toast('Napaka pri shranjevanju.', 'error');
+      console.error(err); toast('Napaka: ' + (err.message || err.error_description || err), 'error', 7000);
     } finally {
       btn.disabled = false; btn.textContent = 'Shrani nastavitve';
     }
