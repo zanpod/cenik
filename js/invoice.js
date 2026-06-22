@@ -408,40 +408,85 @@ const Invoice = (() => {
     return ({ gotovina: 'Gotovina', kartica: 'Kartica', drugo: 'Drugo' })[m] || (m || '—');
   }
 
-  // --- Print v ločenem oknu (čist izpis, primeren za 80mm/A4) ----------------
+  // --- Print: ozek izpis za male (Bluetooth) termalne tiskalnike, 58 mm ------
   function printReceipt(inv, tableLabel, qrImg) {
-    const w = window.open('', '_blank', 'width=400,height=640');
+    const w = window.open('', '_blank', 'width=360,height=640');
     if (!w) { toast('Brskalnik je blokiral pojavno okno za tisk.', 'error'); return; }
     w.document.write(`<!DOCTYPE html><html lang="sl"><head><meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1">
       <title>Račun ${esc(inv.invoice_number)}</title>
       <style>${PRINT_CSS}</style></head>
-      <body onload="window.print()">${receiptHTML(inv, tableLabel, qrImg)}</body></html>`);
+      <body onload="setTimeout(function(){window.print();},150)">${thermalReceiptHTML(inv, tableLabel, qrImg)}</body></html>`);
     w.document.close();
   }
 
+  // Ozka, enobarvna, monospace postavitev (zanesljiva za termalne tiskalnike).
+  function thermalReceiptHTML(inv, tableLabel, qrImg) {
+    const c = inv.currency || '€';
+    const price = (n) => Number(n || 0).toFixed(2).replace('.', ',');
+
+    const items = (inv.items || []).map((it) => `
+      <div class="t-item">
+        <div class="t-iname">${esc(it.name)}</div>
+        <div class="t-row"><span>${it.qty} x ${price(it.unit_price)}${inv.seller_vat_registered ? ' (' + Number(it.vat_rate).toFixed(0) + '%)' : ''}</span><span>${price(it.line_total)} ${c}</span></div>
+      </div>`).join('');
+
+    const vat = inv.seller_vat_registered ? `
+      <div class="hr"></div>
+      <div class="t-row t-small"><span>Osnova</span><span>DDV</span></div>
+      ${(inv.vat_breakdown || []).map((v) => `
+        <div class="t-row t-small"><span>${Number(v.rate).toFixed(1)}%: ${price(v.base)}</span><span>${price(v.vat)} ${c}</span></div>`).join('')}` : `
+      <div class="t-small" style="margin-top:4px">DDV ni obračunan (1. odst. 94. čl. ZDDV-1).</div>`;
+
+    const fiscal = (inv.is_fiscal && inv.eor) ? `
+      ${qrImg ? `<div class="t-qr"><img src="${qrImg}" alt="QR"></div>` : ''}
+      <div class="t-small">ZOI: ${esc(inv.zoi || '')}</div>
+      <div class="t-small">EOR: ${esc(inv.eor || '')}</div>` : `
+      <div class="t-test">TESTNI RAČUN<br>NI DAVČNO POTRJEN (ZDavPR)</div>`;
+
+    return `
+      <div class="t-center t-name">${esc(inv.seller_name || '')}</div>
+      ${inv.seller_address ? `<div class="t-center t-small">${esc(inv.seller_address)}</div>` : ''}
+      <div class="t-center t-small">${inv.seller_vat_registered ? 'ID za DDV: SI' : 'Davčna št.: '}${esc((inv.seller_tax_number || '').replace(/^SI/i, ''))}</div>
+
+      <div class="t-title">RAČUN</div>
+      <div class="t-row"><span>Št.:</span><span>${esc(inv.invoice_number)}</span></div>
+      <div class="t-row"><span>Datum:</span><span>${formatDateTime(inv.issued_at)}</span></div>
+      ${tableLabel ? `<div class="t-row"><span>Miza:</span><span>${esc(tableLabel)}</span></div>` : ''}
+      ${inv.operator_name ? `<div class="t-row"><span>Operater:</span><span>${esc(inv.operator_name)}</span></div>` : ''}
+      <div class="hr"></div>
+      ${items}
+      ${vat}
+      <div class="t-total"><span>ZA PLAČILO</span><span>${price(inv.gross_total)} ${c}</span></div>
+      <div class="t-row"><span>Plačilo:</span><span>${esc(payLabel(inv.payment_method))}</span></div>
+      <div class="hr"></div>
+      ${fiscal}
+      <div class="t-center t-small" style="margin-top:6px">Hvala in nasvidenje!</div>`;
+  }
+
   const PRINT_CSS = `
+    @page { size: 58mm auto; margin: 0; }
     * { box-sizing: border-box; }
-    body { font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; color:#000; background:#fff; margin:0; padding:12px; }
-    .receipt { width: 320px; margin: 0 auto; font-size: 13px; }
-    .rcpt-head { text-align:center; margin-bottom:10px; }
-    .rcpt-seller-name { font-weight:800; font-size:15px; }
-    .rcpt-note-small { font-size:11px; color:#333; margin-top:4px; }
-    .rcpt-title { text-align:center; font-weight:800; font-size:18px; letter-spacing:2px; margin:10px 0; border-top:1px dashed #000; border-bottom:1px dashed #000; padding:6px 0; }
-    .rcpt-row { display:flex; justify-content:space-between; gap:8px; margin:2px 0; }
-    .rcpt-table { width:100%; border-collapse:collapse; margin:10px 0; }
-    .rcpt-table th, .rcpt-table td { text-align:left; padding:3px 2px; border-bottom:1px solid #ddd; font-size:12px; }
-    .rcpt-table .r { text-align:right; }
-    .rcpt-table tfoot td { font-weight:700; border-top:1px solid #000; border-bottom:none; }
-    .rcpt-vat th, .rcpt-vat td { font-size:11px; }
-    .rcpt-total { display:flex; justify-content:space-between; font-weight:800; font-size:17px; margin:10px 0; border-top:2px solid #000; border-bottom:2px solid #000; padding:8px 0; }
-    .rcpt-fiscal { margin:10px 0; }
-    .rcpt-test { border:2px dashed #c00; color:#c00; padding:8px; font-size:11px; font-weight:700; text-align:center; border-radius:6px; }
-    .rcpt-qr { text-align:center; margin:8px 0; }
-    .rcpt-qr img { width:140px; height:140px; }
-    .rcpt-foot { text-align:center; margin-top:12px; font-size:12px; }
+    html, body { margin: 0; padding: 0; background: #fff; }
+    body { width: 58mm; padding: 2mm 2.5mm; color: #000;
+      font-family: 'Courier New', ui-monospace, monospace; font-size: 9pt; line-height: 1.25; }
+    .t-center { text-align: center; }
+    .t-name { font-weight: 700; font-size: 11pt; }
+    .t-small { font-size: 8pt; }
+    .t-title { text-align: center; font-weight: 700; font-size: 12pt; letter-spacing: 2px; margin: 4px 0; }
+    .hr { border-top: 1px dashed #000; margin: 4px 0; }
+    .t-row { display: flex; justify-content: space-between; gap: 4px; }
+    .t-item { margin: 3px 0; }
+    .t-iname { font-weight: 700; }
+    .t-total { display: flex; justify-content: space-between; font-weight: 700; font-size: 12pt;
+      border-top: 1px solid #000; border-bottom: 1px solid #000; padding: 3px 0; margin: 4px 0; }
+    .t-test { border: 1px dashed #000; padding: 4px; font-size: 8pt; font-weight: 700; text-align: center; margin: 4px 0; }
+    .t-qr { text-align: center; margin: 4px 0; }
+    .t-qr img { width: 30mm; height: 30mm; }
   `;
 
   return { open, openForTable, close };
 })();
 
 window.Invoice = Invoice;
+
