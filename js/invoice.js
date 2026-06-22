@@ -99,7 +99,13 @@ const Invoice = (() => {
       .is('invoice_id', null)
       .eq('orders.table_id', tableId)
       .neq('orders.status', 'cancelled');
-    if (error) { console.error(error); body.innerHTML = '<p class="muted">Napaka pri nalaganju.</p>'; return; }
+    if (error) {
+      console.error(error);
+      body.innerHTML = `<p class="muted">Napaka pri nalaganju.</p>
+        <p class="rcpt-test" style="margin-top:10px">${esc(error.message || String(error))}</p>
+        <p class="muted" style="font-size:.8rem">Če napaka omenja <code>invoice_id</code> ali <code>issue_invoice_for_items</code>, zaženite migracijo <code>supabase/migrations/005_invoice_items.sql</code>.</p>`;
+      return;
+    }
 
     // Že izdani računi te mize (za ponovni tisk).
     const { data: invs } = await sb.from('invoices').select('*')
