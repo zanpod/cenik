@@ -217,7 +217,8 @@ const Invoice = (() => {
     }
     let qrImg = '';
     if (inv.zoi && inv.eor) {
-      const qrText = fursQrData(inv.zoi, String(inv.seller_tax_number || '').replace(/^SI/i, ''), inv.issued_at);
+      // Po možnosti uporabi QR, ki ga je vrnil strežnik (zagotovljena skladnost).
+      const qrText = inv.qr || fursQrData(inv.zoi, String(inv.seller_tax_number || '').replace(/^SI/i, ''), inv.issued_at);
       qrImg = await qrDataUrl(qrText);
     }
     body.innerHTML = `
@@ -235,7 +236,7 @@ const Invoice = (() => {
     try {
       const { data, error } = await sb.functions.invoke('furs-fiscalize', { body: { invoice_id: inv.id } });
       if (error) throw error;
-      if (data && data.eor) return { ...inv, zoi: data.zoi, eor: data.eor, is_fiscal: true };
+      if (data && data.eor) return { ...inv, zoi: data.zoi, eor: data.eor, qr: data.qr, is_fiscal: true };
       throw new Error((data && data.message) || 'Brez EOR');
     } catch (e) {
       console.error(e);
@@ -245,11 +246,15 @@ const Invoice = (() => {
   }
 
   // QR vsebina po FURS (60 števk) — zrcali supabase/functions/_shared/furs.ts.
+  // Datum/čas v coni Europe/Ljubljana (enako kot strežnik).
   function fursQrData(zoiHex, taxNumber, iso) {
     const dec = BigInt('0x' + zoiHex).toString().padStart(39, '0');
-    const d = new Date(iso); const p = (n) => String(n).padStart(2, '0');
-    const dt = String(d.getFullYear()).slice(2) + p(d.getMonth() + 1) + p(d.getDate()) +
-      p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds());
+    const parts = new Intl.DateTimeFormat('sv-SE', {
+      timeZone: 'Europe/Ljubljana', year: '2-digit', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+    }).formatToParts(new Date(iso));
+    const m = {}; parts.forEach((x) => { m[x.type] = x.value; });
+    const dt = m.year + m.month + m.day + m.hour + m.minute + m.second;
     const base = dec + String(taxNumber).padStart(8, '0') + dt;
     const ctrl = (base.split('').reduce((a, c) => a + Number(c), 0) % 10).toString();
     return base + ctrl;

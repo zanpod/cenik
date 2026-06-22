@@ -1,19 +1,20 @@
 // ============================================================================
-// EPO.SI — FURS fiskalna verifikacija: skupne pomožne funkcije (OGRODJE)
+// EPO.SI — FURS fiskalna verifikacija: skupne pomožne funkcije
 // ----------------------------------------------------------------------------
-// To je SKELET za davčno potrjevanje računov (ZDavPR). Implementira algoritme
-// (ZOI, JWS, QR), ki jih je treba pred uporabo v živo PREVERITI v FURS TEST
-// okolju z realnim certifikatom. Brez veljavnega certifikata in FURS_ENABLED
-// se ne kliče (glej index.ts vsake funkcije).
+// Implementira ZOI, JWS (RS256) in QR po tehnični specifikaciji FURS
+// (Protokol za izmenjavo podatkov — Davčno potrjevanje računov):
+//   https://edavki.durs.si/.../PageD.aspx?category=dpr_teh_spec
 //
-// Uporablja node:crypto (podprto v Supabase Edge runtime).
+// Uporablja node:crypto (podprto v Supabase Edge runtime / Deno).
+// Opomba: format DN v glavi JWS (subject_name/issuer_name) ter morebitna
+// odstopanja je treba potrditi proti FURS TEST okolju (vrača opisne napake).
 // ============================================================================
 
 import { createSign, createHash, X509Certificate } from 'node:crypto';
 
 export type FursEnv = 'test' | 'prod';
 
-// Uradni FURS končni točki (preverite trenutne v tehnični dokumentaciji FURS).
+// Uradni FURS končni točki.
 export function fursBaseUrl(env: FursEnv): string {
   return env === 'prod'
     ? 'https://blagajne.fu.gov.si:9003/v1/cash_registers'
@@ -30,70 +31,77 @@ function b64urlDecode(s: string): Buffer {
   return Buffer.from(s.replace(/-/g, '+').replace(/_/g, '/') + pad, 'base64');
 }
 
+// --- Datum/čas v formatu FURS "yyyy-MM-ddTHH:mm:ss" v coni Europe/Ljubljana --
+// Pomembno: isti niz se uporabi v ZOI, v sporočilu (IssueDateTime) in na QR.
+export function fursDateTime(iso: string): string {
+  const d = new Date(iso);
+  const parts = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Europe/Ljubljana',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  }).formatToParts(d);
+  const m: Record<string, string> = {};
+  parts.forEach((p) => { m[p.type] = p.value; });
+  return `${m.year}-${m.month}-${m.day}T${m.hour}:${m.minute}:${m.second}`;
+}
+
 // ============================================================================
 // ZOI — Zaščitna oznaka izdajatelja
-// ----------------------------------------------------------------------------
 // Konkatenacija: davčna št. + datum/čas izdaje + zap. št. računa + oznaka
-// poslovnega prostora + oznaka el. naprave + znesek računa. Podpis RSA-SHA256,
-// nato MD5 → 32-mestni hex (mala črka). Točen format datuma in vrstni red
-// PREVERITE v FURS tehnični specifikaciji v TEST okolju.
+// poslovnega prostora + oznaka el. naprave + znesek. Podpis RSA-SHA256, nato
+// MD5 → 32-mestni hex (male črke).
 // ============================================================================
 export interface ZoiParams {
-  taxNumber: string;          // 8-mestna davčna številka
-  issueDateTime: string;      // "yyyy-MM-dd'T'HH:mm:ss"
-  invoiceNumber: string | number; // zaporedna številka (numerator)
-  businessPremiseId: string;  // oznaka poslovnega prostora
-  electronicDeviceId: string; // oznaka elektronske naprave
-  invoiceAmount: string;      // npr. "24.31"
+  taxNumber: string;
+  issueDateTime: string;       // FURS format "yyyy-MM-ddTHH:mm:ss"
+  invoiceNumber: string | number;
+  businessPremiseId: string;
+  electronicDeviceId: string;
+  invoiceAmount: string;       // npr. "24.31"
 }
 
 export function computeZOI(p: ZoiParams, privateKeyPem: string): string {
   const input =
-    String(p.taxNumber) +
-    p.issueDateTime +
-    String(p.invoiceNumber) +
-    p.businessPremiseId +
-    p.electronicDeviceId +
-    p.invoiceAmount;
-
+    String(p.taxNumber) + p.issueDateTime + String(p.invoiceNumber) +
+    p.businessPremiseId + p.electronicDeviceId + p.invoiceAmount;
   const signer = createSign('RSA-SHA256');
   signer.update(input, 'utf8');
   signer.end();
-  const signature = signer.sign(privateKeyPem); // Buffer
-  return createHash('md5').update(signature).digest('hex'); // 32 hex, lowercase
+  const signature = signer.sign(privateKeyPem);
+  return createHash('md5').update(signature).digest('hex');
 }
 
 // ============================================================================
-// QR koda na računu (60 števk):
-//   39 števk: ZOI (hex → decimalno, ničle spredaj)
-// +  8 števk: davčna številka
-// + 12 števk: datum/čas "YYMMDDHHmmss"
-// +  1 števka: kontrolna (vsota vseh števk mod 10)
+// QR koda (60 števk): 39 (ZOI hex→dec) + 8 (davčna) + 12 (YYMMDDHHmmss) + 1 (mod 10)
+// Datum se vzame iz ISTEGA FURS niza, da je zagotovljena skladnost.
 // ============================================================================
-export function buildQrData(zoiHex: string, taxNumber: string, issueDateTime: string): string {
+export function buildQrData(zoiHex: string, taxNumber: string, fursDateTimeStr: string): string {
   const dec = BigInt('0x' + zoiHex).toString().padStart(39, '0');
-  const d = new Date(issueDateTime);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  const dt =
-    String(d.getFullYear()).slice(2) + pad(d.getMonth() + 1) + pad(d.getDate()) +
-    pad(d.getHours()) + pad(d.getMinutes()) + pad(d.getSeconds());
-  const base = dec + String(taxNumber).padStart(8, '0') + dt; // 59
+  const dt = fursDateTimeStr; // "yyyy-MM-ddTHH:mm:ss"
+  const yy = dt.slice(2, 4) + dt.slice(5, 7) + dt.slice(8, 10) +
+             dt.slice(11, 13) + dt.slice(14, 16) + dt.slice(17, 19);
+  const base = dec + String(taxNumber).padStart(8, '0') + yy; // 59
   const control = (base.split('').reduce((a, c) => a + Number(c), 0) % 10).toString();
-  return base + control; // 60
+  return base + control;
+}
+
+// --- Format DN (subject/issuer) za glavo JWS --------------------------------
+// node vrne npr. "C=SI\nO=...\nCN=...". FURS pričakuje en niz; uporabimo
+// RFC4514 vrstni red (od najbolj specifičnega), ločeno z ", ".
+function formatDN(dn: string): string {
+  return dn.split('\n').map((s) => s.trim()).filter(Boolean).reverse().join(', ');
 }
 
 // ============================================================================
-// JWS (kompaktni zapis) — FURS sporočila so podpisana z RS256.
-// Glava vsebuje podatke o certifikatu. Točna polja/format glave PREVERITE v
-// FURS specifikaciji (subject_name/issuer_name format, serial kot decimalka).
+// JWS (kompaktni zapis) — RS256, glava z metapodatki certifikata.
 // ============================================================================
 export function buildJWS(payload: unknown, privateKeyPem: string, certPem: string): string {
   const cert = new X509Certificate(certPem);
   const header = {
     alg: 'RS256',
-    subject_name: cert.subject.replace(/\n/g, ','),
-    date: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
-    issuer_name: cert.issuer.replace(/\n/g, ','),
+    subject_name: formatDN(cert.subject),
+    date: fursDateTime(new Date().toISOString()),
+    issuer_name: formatDN(cert.issuer),
     serial: BigInt('0x' + cert.serialNumber).toString(),
   };
   const h = b64url(JSON.stringify(header));
@@ -102,8 +110,7 @@ export function buildJWS(payload: unknown, privateKeyPem: string, certPem: strin
   const signer = createSign('RSA-SHA256');
   signer.update(signingInput, 'utf8');
   signer.end();
-  const sig = b64url(signer.sign(privateKeyPem));
-  return `${signingInput}.${sig}`;
+  return `${signingInput}.${b64url(signer.sign(privateKeyPem))}`;
 }
 
 // Razčleni JWS odgovor FURS in vrne payload kot objekt.
@@ -113,12 +120,6 @@ export function parseJWS(token: string): any {
   return JSON.parse(b64urlDecode(parts[1]).toString('utf8'));
 }
 
-// --- Gradnja sporočil --------------------------------------------------------
 export function uuid(): string {
   return crypto.randomUUID();
-}
-
-export function fursDateTime(iso: string): string {
-  // FURS pričakuje "yyyy-MM-dd'T'HH:mm:ss" (brez milisekund/cone).
-  return new Date(iso).toISOString().replace(/\.\d{3}Z$/, '').replace('Z', '');
 }

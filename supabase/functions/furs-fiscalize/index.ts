@@ -76,7 +76,8 @@ Deno.serve(async (req) => {
     const { data: inv } = await admin.from('invoices').select('*').eq('id', invoice_id).maybeSingle();
     if (!inv || inv.tenant_id !== profile.tenant_id) return json({ error: 'Račun ne obstaja' }, 404);
     if (inv.eor) {
-      return json({ zoi: inv.zoi, eor: inv.eor, qr: buildQrData(inv.zoi, inv.seller_tax_number, inv.issued_at) });
+      const dt0 = fursDateTime(inv.issued_at);
+      return json({ zoi: inv.zoi, eor: inv.eor, qr: buildQrData(inv.zoi, String(inv.seller_tax_number || '').replace(/^SI/i, ''), dt0) });
     }
 
     const taxNumber = String(inv.seller_tax_number || '').replace(/^SI/i, '');
@@ -93,17 +94,22 @@ Deno.serve(async (req) => {
       invoiceAmount: amount,
     }, privateKey);
 
-    // 4) InvoiceRequest (struktura — PREVERITE polja v FURS specifikaciji)
+    // 4) InvoiceRequest (po FURS specifikaciji)
     const vat = (inv.vat_breakdown || []).map((v: any) => ({
       TaxRate: Number(v.rate), TaxableAmount: Number(v.base), TaxAmount: Number(v.vat),
     }));
+    // Zavezanec za DDV → VAT; mali zavezanec (oproščeno 94. čl.) → ExemptVATTaxableAmount.
+    const taxesPerSeller = inv.seller_vat_registered
+      ? [{ VAT: vat }]
+      : [{ ExemptVATTaxableAmount: Number(amount) }];
+
     const payload = {
       InvoiceRequest: {
         Header: { MessageID: uuid(), DateTime: issueDateTime },
         Invoice: {
           TaxNumber: Number(taxNumber),
           IssueDateTime: issueDateTime,
-          NumberingStructure: 'C',
+          NumberingStructure: 'B', // B = številčenje po elektronski napravi (naš števec je po napravi)
           InvoiceIdentifier: {
             BusinessPremiseID: inv.premise_label,
             ElectronicDeviceID: inv.device_label,
@@ -111,9 +117,10 @@ Deno.serve(async (req) => {
           },
           InvoiceAmount: Number(amount),
           PaymentAmount: Number(amount),
-          TaxesPerSeller: [vat.length ? { VAT: vat } : { OtherTaxesAmount: 0 }],
-          OperatorTaxNumber: Number(taxNumber), // TODO: davčna št. operaterja
+          TaxesPerSeller: taxesPerSeller,
+          OperatorTaxNumber: Number(inv.operator_tax_no || taxNumber), // idealno davčna št. operaterja
           ProtectedID: zoi,
+          SubsequentSubmit: false,
         },
       },
     };
@@ -139,7 +146,7 @@ Deno.serve(async (req) => {
     // 7) Posodobi račun
     await admin.from('invoices').update({ zoi, eor, is_fiscal: true }).eq('id', inv.id);
 
-    return json({ zoi, eor, qr: buildQrData(zoi, taxNumber, inv.issued_at) });
+    return json({ zoi, eor, qr: buildQrData(zoi, taxNumber, issueDateTime) });
   } catch (err) {
     console.error(err);
     return json({ error: 'exception', message: String(err?.message || err) }, 500);

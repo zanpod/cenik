@@ -51,6 +51,17 @@
         <button class="btn btn-primary" id="s-save-fiscal">Shrani podatke za račune</button>
       </div>
 
+      <div class="card glass" style="margin-bottom:18px; max-width:620px">
+        <h2 style="margin-top:0">Davčno potrjevanje (FURS)</h2>
+        <p class="muted" style="margin-top:-4px">Ko je vklopljeno, se ob izdaji računa pridobita <strong>ZOI in EOR</strong> ter QR koda prek strežniške funkcije (zahteva nastavljen certifikat — glej <code>supabase/functions/README.md</code>). Če certifikat ni nastavljen, izdaja ostane testna (nepotrjena).</p>
+        <label class="switch" style="margin:6px 0 14px"><input type="checkbox" id="s-fiscal-enabled" ${tenant.fiscal_enabled ? 'checked' : ''}/><span class="track"></span><span>Vklopi davčno potrjevanje</span></label>
+        <div class="row wrap">
+          <button class="btn btn-primary" id="s-save-furs">Shrani</button>
+          <button class="btn" id="s-register-premise">Registriraj poslovni prostor (FURS)</button>
+        </div>
+        <div class="muted" style="font-size:.8rem;margin-top:10px">⚠️ TEST okolje: nastavite <code>FURS_ENV=test</code> in testni certifikat. Pred prvim računom enkrat registrirajte poslovni prostor. Računi v testu niso pravno veljavni.</div>
+      </div>
+
       <div class="card glass" style="max-width:620px">
         <h2 style="margin-top:0">Osebje</h2>
         <p class="muted">Povabite osebje. Po registraciji jih povežite z restavracijo.</p>
@@ -69,8 +80,45 @@
 
     document.getElementById('s-save').addEventListener('click', save);
     document.getElementById('s-save-fiscal').addEventListener('click', saveFiscal);
+    document.getElementById('s-save-furs').addEventListener('click', saveFurs);
+    document.getElementById('s-register-premise').addEventListener('click', registerPremise);
     const inviteBtn = document.getElementById('invite-btn');
     if (inviteBtn) inviteBtn.addEventListener('click', invite);
+  }
+
+  async function saveFurs() {
+    const btn = document.getElementById('s-save-furs');
+    btn.disabled = true; btn.textContent = 'Shranjujem…';
+    try {
+      const enabled = document.getElementById('s-fiscal-enabled').checked;
+      const { error } = await sb.from('tenants').update({ fiscal_enabled: enabled }).eq('id', tenant.id);
+      if (error) throw error;
+      tenant.fiscal_enabled = enabled;
+      toast(enabled ? 'Davčno potrjevanje vklopljeno.' : 'Davčno potrjevanje izklopljeno.', 'success');
+    } catch (err) {
+      console.error(err); toast('Napaka pri shranjevanju.', 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Shrani';
+    }
+  }
+
+  async function registerPremise() {
+    if (!confirm('Registriram poslovni prostor pri FURS? (Potrebno enkrat pred prvim računom.)')) return;
+    const btn = document.getElementById('s-register-premise');
+    btn.disabled = true; btn.textContent = 'Registriram…';
+    try {
+      // Za TEST: premična naprava (C). Za fiksni prostor uporabite real_estate
+      // podatke (kataster) — glej supabase/functions/README.md.
+      const { data, error } = await sb.functions.invoke('furs-register-premise', { body: { movable_type: 'C' } });
+      if (error) throw error;
+      if (data && data.error) throw new Error(data.message || data.error);
+      toast('Poslovni prostor registriran pri FURS.', 'success', 5000);
+    } catch (err) {
+      console.error(err);
+      toast('Registracija ni uspela: ' + (err.message || ''), 'error', 7000);
+    } finally {
+      btn.disabled = false; btn.textContent = 'Registriraj poslovni prostor (FURS)';
+    }
   }
 
   async function saveFiscal() {
