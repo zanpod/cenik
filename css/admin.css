@@ -208,10 +208,12 @@
 .bill-list { display: flex; flex-direction: column; gap: 2px; max-height: 40vh; overflow-y: auto; }
 .bill-line { display: flex; align-items: center; gap: 10px; padding: 10px 8px; border-radius: var(--radius-sm); cursor: pointer; }
 .bill-line:hover { background: var(--surface); }
-.bill-line input { width: 20px; height: 20px; accent-color: var(--brand-primary); }
-.bill-qty { font-weight: 800; color: var(--brand-primary); min-width: 30px; }
+.bill-line .bill-cb { width: 20px; height: 20px; accent-color: var(--brand-primary); }
 .bill-name { flex: 1; }
-.bill-amt { font-weight: 700; }
+.bill-amt { font-weight: 700; min-width: 78px; text-align: right; }
+.bill-qtybox { display: flex; align-items: center; gap: 6px; }
+.bill-qtybox .bill-qty-in { width: 56px; text-align: center; padding: 6px; }
+.bill-qtybox .btn { min-height: 32px; width: 32px; padding: 0; }
 .bill-section { margin-top: 18px; }
 .bill-section h3 { font-size: 0.95rem; margin: 0 0 6px; }
 

@@ -121,12 +121,17 @@ const Invoice = (() => {
     const cur = (window.AdminShell && AdminShell.tenant && AdminShell.tenant.currency) || '€';
 
     const lines = items.map((it) => `
-      <label class="bill-line">
-        <input type="checkbox" class="bill-cb" value="${it.id}" data-total="${(it.item_price * it.quantity).toFixed(2)}" checked />
-        <span class="bill-qty">${it.quantity}×</span>
-        <span class="bill-name">${esc(it.item_name)}</span>
+      <div class="bill-line" data-id="${it.id}" data-price="${it.item_price}" data-max="${it.quantity}">
+        <input type="checkbox" class="bill-cb" checked />
+        <span class="bill-name">${esc(it.item_name)} <span class="muted" style="font-weight:400">${formatPrice(it.item_price, cur)}/kos</span></span>
+        <div class="bill-qtybox">
+          <button class="btn btn-sm bill-minus" type="button">−</button>
+          <input class="input bill-qty-in" type="number" min="0" max="${it.quantity}" value="${it.quantity}" />
+          <button class="btn btn-sm bill-plus" type="button">＋</button>
+          <span class="muted">/ ${it.quantity}</span>
+        </div>
         <span class="bill-amt">${formatPrice(it.item_price * it.quantity, cur)}</span>
-      </label>`).join('');
+      </div>`).join('');
 
     const invList = invs.length ? `
       <div class="bill-section">
@@ -140,14 +145,14 @@ const Invoice = (() => {
       </div>` : '';
 
     body.innerHTML = `
-      <p class="muted">Miza <strong>${esc(tableLabel || '')}</strong> — izberite postavke za obračun
-        (vse = skupni račun, izbrane = deljeni račun).</p>
+      <p class="muted">Miza <strong>${esc(tableLabel || '')}</strong> — izberite postavke in količine
+        (vse = skupni račun, del = deljeni račun, npr. 1 od 2 kav).</p>
       ${items.length ? `
         <div class="row" style="margin-bottom:8px">
           <button class="btn btn-sm" id="bill-all">Izberi vse</button>
           <button class="btn btn-sm" id="bill-none">Počisti</button>
           <span class="spacer"></span>
-          <strong id="bill-sum">${formatPrice(items.reduce((s, i) => s + i.item_price * i.quantity, 0), cur)}</strong>
+          <strong id="bill-sum"></strong>
         </div>
         <div class="bill-list">${lines}</div>
         <div class="field" style="margin-top:12px">
@@ -164,15 +169,49 @@ const Invoice = (() => {
       ${invList}`;
 
     if (items.length) {
-      const cbs = () => Array.from(body.querySelectorAll('.bill-cb'));
+      const rows = () => Array.from(body.querySelectorAll('.bill-line'));
+      const lineQty = (row) => {
+        const cb = row.querySelector('.bill-cb');
+        if (!cb.checked) return 0;
+        const max = Number(row.dataset.max);
+        let q = parseInt(row.querySelector('.bill-qty-in').value, 10);
+        if (isNaN(q) || q < 0) q = 0;
+        return Math.min(q, max);
+      };
       const recalc = () => {
-        const sum = cbs().filter((c) => c.checked).reduce((s, c) => s + Number(c.dataset.total), 0);
+        let sum = 0;
+        rows().forEach((row) => {
+          const q = lineQty(row);
+          const amt = q * Number(row.dataset.price);
+          row.querySelector('.bill-amt').textContent = formatPrice(amt, cur);
+          row.style.opacity = row.querySelector('.bill-cb').checked ? '1' : '0.5';
+          sum += amt;
+        });
         document.getElementById('bill-sum').textContent = formatPrice(sum, cur);
       };
-      body.querySelectorAll('.bill-cb').forEach((c) => c.addEventListener('change', recalc));
-      document.getElementById('bill-all').addEventListener('click', () => { cbs().forEach((c) => c.checked = true); recalc(); });
-      document.getElementById('bill-none').addEventListener('click', () => { cbs().forEach((c) => c.checked = false); recalc(); });
+      rows().forEach((row) => {
+        const input = row.querySelector('.bill-qty-in');
+        const cb = row.querySelector('.bill-cb');
+        const max = Number(row.dataset.max);
+        cb.addEventListener('change', recalc);
+        input.addEventListener('input', () => { cb.checked = Number(input.value) > 0; recalc(); });
+        row.querySelector('.bill-minus').addEventListener('click', () => {
+          input.value = Math.max(0, (parseInt(input.value, 10) || 0) - 1); cb.checked = Number(input.value) > 0; recalc();
+        });
+        row.querySelector('.bill-plus').addEventListener('click', () => {
+          input.value = Math.min(max, (parseInt(input.value, 10) || 0) + 1); cb.checked = true; recalc();
+        });
+      });
+      document.getElementById('bill-all').addEventListener('click', () => {
+        rows().forEach((row) => { row.querySelector('.bill-cb').checked = true; row.querySelector('.bill-qty-in').value = row.dataset.max; });
+        recalc();
+      });
+      document.getElementById('bill-none').addEventListener('click', () => {
+        rows().forEach((row) => { row.querySelector('.bill-cb').checked = false; });
+        recalc();
+      });
       document.getElementById('bill-issue').addEventListener('click', () => issueSelected(tableId, tableLabel));
+      recalc();
     }
     body.querySelectorAll('[data-reprint]').forEach((b) =>
       b.addEventListener('click', () => {
@@ -182,12 +221,19 @@ const Invoice = (() => {
   }
 
   async function issueSelected(tableId, tableLabel) {
-    const ids = Array.from(document.querySelectorAll('.bill-cb')).filter((c) => c.checked).map((c) => c.value);
-    if (!ids.length) { toast('Izberite vsaj eno postavko.', 'error'); return; }
+    const lines = [];
+    document.querySelectorAll('.bill-line').forEach((row) => {
+      const cb = row.querySelector('.bill-cb');
+      if (!cb.checked) return;
+      let q = parseInt(row.querySelector('.bill-qty-in').value, 10);
+      q = Math.min(isNaN(q) ? 0 : q, Number(row.dataset.max));
+      if (q > 0) lines.push({ id: row.dataset.id, qty: q });
+    });
+    if (!lines.length) { toast('Izberite vsaj eno postavko.', 'error'); return; }
     const btn = document.getElementById('bill-issue');
     btn.disabled = true; btn.textContent = 'Obračunavam…';
-    const { data, error } = await sb.rpc('issue_invoice_for_items', {
-      p_item_ids: ids,
+    const { data, error } = await sb.rpc('issue_invoice_for_quantities', {
+      p_lines: lines,
       p_payment_method: document.getElementById('inv-pay').value,
     });
     if (error) {

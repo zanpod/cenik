@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0a0b14" />
+  <title>Zaloge — EPO.SI Admin</title>
+  <link rel="stylesheet" href="/css/common.css" />
+  <link rel="stylesheet" href="/css/admin.css" />
+</head>
+<body>
+  <div id="admin-shell" class="admin-shell"></div>
+
+  <!-- Ingredient modal -->
+  <div class="modal-backdrop" id="ing-modal">
+    <div class="modal glass">
+      <div class="modal-head"><h2 id="ing-modal-title">Surovina / blago</h2><button class="btn btn-ghost btn-icon" data-close="ing-modal">✕</button></div>
+      <div class="field"><label>Naziv</label><input class="input" id="ing-name" placeholder="npr. Kava, Mleko, Coca-Cola 0,33" /></div>
+      <div class="field"><label>Osnovna enota (vodenje zaloge)</label>
+        <select class="select" id="ing-unit">
+          <option value="ml">ml (tekočine — prevzem v litrih)</option>
+          <option value="g">g (teža — prevzem v kilogramih)</option>
+          <option value="kos">kos (kos — prevzem v kosih)</option>
+        </select>
+      </div>
+      <div class="row wrap">
+        <div class="field" style="flex:1"><label>Nabavna cena (na <span class="ing-punit">L</span>)</label><input class="input" type="number" step="0.0001" id="ing-purchase" value="0" /></div>
+        <div class="field" style="flex:1"><label>Prodajna cena (na <span class="ing-punit">L</span>)</label><input class="input" type="number" step="0.0001" id="ing-sale" value="0" /></div>
+      </div>
+      <div class="field" id="ing-stock-field"><label>Začetna zaloga (<span class="ing-punit">L</span>)</label><input class="input" type="number" step="0.001" id="ing-stock" value="0" /></div>
+      <div class="modal-actions">
+        <button class="btn" data-close="ing-modal">Prekliči</button>
+        <button class="btn btn-primary" id="ing-save">Shrani</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/js/supabase-config.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/admin-auth.js"></script>
+  <script src="/js/inventory.js"></script>
+</body>
+</html>
