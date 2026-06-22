@@ -31,7 +31,10 @@
     tables = tb.data || [];
     categories = c.data || [];
     items = i.data || [];
-    selectedTableId = tables[0]?.id || null;
+    // Ohrani izbrano mizo (npr. po oddaji runde), sicer privzeto prva.
+    if (!selectedTableId || !tables.some((t) => t.id === selectedTableId)) {
+      selectedTableId = tables[0]?.id || null;
+    }
   }
 
   function renderLayout() {
@@ -39,14 +42,14 @@
       <div class="field" style="max-width:360px">
         <label>Miza</label>
         <select class="select" id="no-table">
-          ${tables.map((t) => `<option value="${t.id}">${esc(t.label || 'Miza ' + t.table_number)}</option>`).join('')}
+          ${tables.map((t) => `<option value="${t.id}" ${t.id === selectedTableId ? 'selected' : ''}>${esc(t.label || 'Miza ' + t.table_number)}</option>`).join('')}
         </select>
       </div>
       ${tables.length ? '' : '<p class="muted">Najprej dodajte mize v razdelku »Mize«.</p>'}
       <div id="no-tabs" class="cat-tabs"></div>
       <div id="no-list" class="menu-list" style="padding:8px 0 150px"></div>`;
     const sel = document.getElementById('no-table');
-    if (sel) sel.addEventListener('change', (e) => { selectedTableId = e.target.value; });
+    if (sel) { sel.value = selectedTableId || ''; sel.addEventListener('change', (e) => { selectedTableId = e.target.value; }); }
     renderTabs();
     renderItems();
   }

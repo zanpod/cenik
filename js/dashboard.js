@@ -6,7 +6,7 @@
   let tenant = null;
   let orders = [];           // array of order objects with .items[]
   let tablesById = {};
-  let activeFilter = 'new';  // new | preparing | served | today
+  let activeFilter = 'tables';  // tables | new | preparing | served | today
   let soundEnabled = true;
   let timeTimer = null;
 
