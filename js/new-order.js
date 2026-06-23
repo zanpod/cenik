@@ -96,34 +96,52 @@
     const card = document.createElement('div');
     card.className = 'menu-item glass' + (it.is_available ? '' : ' unavailable');
     card.dataset.id = it.id;
+    const hasVariants = Array.isArray(it.variants) && it.variants.length > 0;
     const qty = cart[it.id]?.qty || 0;
-    card.innerHTML = `
-      <div class="item-main">
-        <div class="item-name">${esc(it.name)}</div>
-        <div class="item-bottom">
-          <span class="item-price">${formatPrice(it.price, tenant.currency)}</span>
-          ${stockBadge(it)}
-          <div class="stepper${qty > 0 ? ' has-qty' : ''}" data-id="${it.id}">
+    const controls = hasVariants
+      ? `<div class="variant-row">${it.variants.map((v, i) => `<button class="variant-chip" data-vi="${i}">${esc(v.name)} · ${formatPrice(v.price, tenant.currency)}</button>`).join('')}</div>`
+      : `<div class="stepper${qty > 0 ? ' has-qty' : ''}" data-id="${it.id}">
             <button class="step-btn add add-only" aria-label="Dodaj">＋</button>
             <div class="qty-controls">
               <button class="step-btn minus" aria-label="Odstrani">−</button>
               <span class="step-qty">${qty}</span>
               <button class="step-btn add plus" aria-label="Dodaj">＋</button>
             </div>
-          </div>
+          </div>`;
+    card.innerHTML = `
+      <div class="item-main">
+        <div class="item-name">${esc(it.name)}</div>
+        <div class="item-bottom">
+          <span class="item-price">${hasVariants ? 'od ' : ''}${formatPrice(hasVariants ? Math.min(...it.variants.map((v) => v.price)) : it.price, tenant.currency)}</span>
+          ${stockBadge(it)}
+          ${controls}
         </div>
       </div>`;
-    const stepper = card.querySelector('.stepper');
-    const add = () => addItem(it);
-    card.querySelector('.add-only').addEventListener('click', add);
-    card.querySelector('.plus').addEventListener('click', add);
-    card.querySelector('.minus').addEventListener('click', () => removeItem(it.id));
-    stepper._update = () => {
-      const q = cart[it.id]?.qty || 0;
-      stepper.classList.toggle('has-qty', q > 0);
-      stepper.querySelector('.step-qty').textContent = q;
-    };
+    if (hasVariants) {
+      card.querySelectorAll('.variant-chip').forEach((chip) => chip.addEventListener('click', () => {
+        const v = it.variants[Number(chip.dataset.vi)];
+        addVariant(it, v);
+      }));
+    } else {
+      const stepper = card.querySelector('.stepper');
+      const add = () => addItem(it);
+      card.querySelector('.add-only').addEventListener('click', add);
+      card.querySelector('.plus').addEventListener('click', add);
+      card.querySelector('.minus').addEventListener('click', () => removeItem(it.id));
+      stepper._update = () => {
+        const q = cart[it.id]?.qty || 0;
+        stepper.classList.toggle('has-qty', q > 0);
+        stepper.querySelector('.step-qty').textContent = q;
+      };
+    }
     return card;
+  }
+
+  function addVariant(it, v) {
+    const key = `${it.id}|${v.name}`;
+    if (cart[key]) cart[key].qty += 1;
+    else cart[key] = { id: key, menu_item_id: it.id, name: `${it.name} – ${v.name}`, price: Number(v.price), qty: 1, note: '' };
+    refresh();
   }
 
   function addItem(it) {
@@ -134,7 +152,7 @@
       if (!ok) return;
     }
     if (cart[it.id]) cart[it.id].qty += 1;
-    else cart[it.id] = { id: it.id, name: it.name, price: Number(it.price), qty: 1, note: '' };
+    else cart[it.id] = { id: it.id, menu_item_id: it.id, name: it.name, price: Number(it.price), qty: 1, note: '' };
     refresh();
   }
 
@@ -250,7 +268,7 @@
       if (oe) throw oe;
 
       const rows = list.map((it) => ({
-        order_id: order.id, menu_item_id: it.id, tenant_id: tenant.id,
+        order_id: order.id, menu_item_id: it.menu_item_id || it.id, tenant_id: tenant.id,
         item_name: it.name, item_price: it.price, quantity: it.qty, notes: it.note || null,
       }));
       const { error: ie } = await sb.from('order_items').insert(rows);

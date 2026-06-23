@@ -38,6 +38,7 @@ const Cart = (() => {
     } else {
       items[id] = {
         id,
+        menu_item_id: menuItem.menu_item_id || menuItem.id,
         name: menuItem.name,
         price: Number(menuItem.price),
         quantity: 1,

@@ -8,6 +8,7 @@
   let items = [];
   let ingredients = [];
   let recipeRows = [];   // [{ ingredient_id, quantity }] za odprt item modal
+  let variantRows = [];  // [{ name, price }] za odprt item modal
   let editingCatId = null;
   let editingItemId = null;
 
@@ -24,6 +25,7 @@
     document.getElementById('add-item').addEventListener('click', () => openItemModal());
     document.getElementById('ing-add').addEventListener('click', addIngredient);
     document.getElementById('item-add-ingredient').addEventListener('click', () => { recipeRows.push({ ingredient_id: '', quantity: 0 }); renderRecipeRows(); });
+    document.getElementById('item-add-variant').addEventListener('click', () => { variantRows.push({ name: '', price: 0 }); renderVariantRows(); });
     wireModals();
     await load();
   }
@@ -92,6 +94,20 @@
   async function reloadIngredients() {
     const { data } = await sb.from('ingredients').select('*').eq('tenant_id', tenant.id).order('name');
     ingredients = data || [];
+  }
+
+  function renderVariantRows() {
+    const host = document.getElementById('item-variant-rows');
+    if (!variantRows.length) { host.innerHTML = '<p class="muted" style="font-size:.82rem;margin:0">Brez variant.</p>'; return; }
+    host.innerHTML = variantRows.map((v, idx) => `
+      <div class="row" style="margin-bottom:6px">
+        <input class="input var-name" data-idx="${idx}" placeholder="npr. Velika" value="${esc(v.name)}" style="flex:1" />
+        <input class="input var-price" data-idx="${idx}" type="number" step="0.01" placeholder="cena" value="${v.price}" style="width:110px" />
+        <button class="btn btn-sm btn-danger var-del" data-idx="${idx}" type="button">🗑</button>
+      </div>`).join('');
+    host.querySelectorAll('.var-name').forEach((s) => s.addEventListener('input', (e) => { variantRows[+e.target.dataset.idx].name = e.target.value; }));
+    host.querySelectorAll('.var-price').forEach((s) => s.addEventListener('input', (e) => { variantRows[+e.target.dataset.idx].price = Number(e.target.value) || 0; }));
+    host.querySelectorAll('.var-del').forEach((b) => b.addEventListener('click', (e) => { variantRows.splice(+e.target.dataset.idx, 1); renderVariantRows(); }));
   }
 
   // --- Receptura v item modalu ----------------------------------------------
@@ -273,6 +289,10 @@
     sel.innerHTML = '<option value="">— brez kategorije —</option>' +
       categories.map((c) => `<option value="${c.id}" ${it && it.category_id === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
 
+    document.getElementById('item-station').value = it?.prep_station || 'sank';
+    variantRows = Array.isArray(it?.variants) ? it.variants.map((v) => ({ name: v.name, price: Number(v.price) })) : [];
+    renderVariantRows();
+
     // Receptura: naloži obstoječe sestavine izdelka.
     recipeRows = [];
     renderRecipeRows();
@@ -327,6 +347,8 @@
         is_available: document.getElementById('item-available').checked,
         track_stock: document.getElementById('item-track-stock').checked,
         stock_quantity: Number(document.getElementById('item-stock').value) || 0,
+        prep_station: document.getElementById('item-station').value,
+        variants: variantRows.filter((v) => v.name && v.price >= 0).map((v) => ({ name: v.name, price: Number(v.price) })),
       };
       const file = document.getElementById('item-image').files[0];
       if (file) payload.image_url = await uploadImage(file);

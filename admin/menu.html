@@ -50,6 +50,19 @@
         <div class="muted" style="font-size:.78rem;margin-top:6px">Npr. Kava z mlekom: Kava 8 (g) + Mleko 10 (ml). Ob prodaji se samodejno odpiše iz zaloge surovin.</div>
       </div>
       <div class="field"><label>Slika</label><input class="input" type="file" id="item-image" accept="image/*" /><div id="item-image-preview" class="muted" style="margin-top:6px"></div></div>
+      <div class="field"><label>Pripravljalno mesto (bon)</label>
+        <select class="select" id="item-station">
+          <option value="sank">Šank</option>
+          <option value="kuhinja">Kuhinja</option>
+          <option value="brez">Brez (ne tiska se na bon)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Variante (npr. velika/mala) — neobvezno</label>
+        <div id="item-variant-rows"></div>
+        <button class="btn btn-sm" type="button" id="item-add-variant" style="margin-top:6px">＋ Dodaj varianto</button>
+        <div class="muted" style="font-size:.78rem;margin-top:6px">Vsaka varianta ima svoje ime in ceno. Gost izbere varianto ob naročilu.</div>
+      </div>
       <label class="switch"><input type="checkbox" id="item-available" checked /><span class="track"></span><span>Na voljo</span></label>
       <div class="modal-actions">
         <button class="btn" data-close="item-modal">Prekliči</button>

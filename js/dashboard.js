@@ -6,7 +6,8 @@
   let tenant = null;
   let orders = [];           // array of order objects with .items[]
   let tablesById = {};
-  let activeFilter = 'tables';  // tables | new | preparing | served | today
+  let activeFilter = 'tables';  // tables | new | served | today
+  let stationById = {};
   let soundEnabled = true;
   let timeTimer = null;
 
@@ -79,6 +80,42 @@
     const { data } = await sb.from('tables').select('*').eq('tenant_id', tenant.id);
     tablesById = {};
     (data || []).forEach((t) => { tablesById[t.id] = t; });
+    const { data: mi } = await sb.from('menu_items').select('id, prep_station').eq('tenant_id', tenant.id);
+    stationById = {};
+    (mi || []).forEach((m) => { stationById[m.id] = m.prep_station || 'sank'; });
+  }
+
+  // --- Bon za kuhinjo/šank --------------------------------------------------
+  function printBon(o) {
+    const table = tablesById[o.table_id];
+    const label = table ? (table.label || `Miza ${table.table_number}`) : 'Miza';
+    const groups = { kuhinja: [], sank: [] };
+    (o.items || []).forEach((it) => {
+      const st = stationById[it.menu_item_id] || 'sank';
+      if (st === 'brez') return;
+      (groups[st] || groups.sank).push(it);
+    });
+    const section = (title, list) => list.length ? `
+      <div class="b-title">${title}</div>
+      ${list.map((it) => `<div class="b-item">${it.quantity}× ${esc(it.item_name)}${it.notes ? `<div class="b-note">↳ ${esc(it.notes)}</div>` : ''}</div>`).join('')}` : '';
+    const body = section('KUHINJA', groups.kuhinja) + section('ŠANK', groups.sank);
+    if (!body) { toast('Ni postavk za bon.', 'error'); return; }
+    const w = window.open('', '_blank', 'width=360,height=600');
+    if (!w) { toast('Brskalnik je blokiral okno za tisk.', 'error'); return; }
+    w.document.write(`<!DOCTYPE html><html lang="sl"><head><meta charset="utf-8"><title>Bon ${esc(label)}</title>
+      <style>
+        @page{size:58mm auto;margin:0}
+        body{width:58mm;margin:0;padding:3mm;font-family:'Courier New',monospace;color:#000;font-size:11pt}
+        .b-head{text-align:center;font-weight:700;font-size:13pt;border-bottom:1px dashed #000;padding-bottom:3px;margin-bottom:4px}
+        .b-title{font-weight:700;margin:6px 0 2px;border-top:1px dashed #000;padding-top:4px}
+        .b-item{margin:2px 0;font-size:12pt}
+        .b-note{font-size:9pt;padding-left:10px}
+        .b-meta{font-size:9pt;text-align:center;margin-bottom:4px}
+      </style></head><body onload="setTimeout(function(){window.print();},150)">
+      <div class="b-head">${esc(label)}</div>
+      <div class="b-meta">${formatTime(o.created_at)}</div>
+      ${body}</body></html>`);
+    w.document.close();
   }
 
   async function loadOrders() {
@@ -182,6 +219,7 @@
           <div class="order-actions">
             ${o.status === 'new' ? `<button class="btn btn-success btn-sm" data-act="served" data-id="${o.id}">Postreženo</button>` : ''}
             ${o.status === 'served' ? `<button class="btn btn-sm" data-act="new" data-id="${o.id}">↩ Nazaj na novo</button>` : ''}
+            <button class="btn btn-sm" data-bon="${o.id}">🍳 Bon</button>
             <button class="btn btn-danger btn-sm" data-act="cancelled" data-id="${o.id}">Prekliči</button>
           </div>
         </div>`).join('');
@@ -224,8 +262,9 @@
     } else if (o.status === 'served') {
       actions = `<button class="btn btn-sm" data-act="new" data-id="${o.id}">↩ Nazaj na novo</button>`;
     }
-    // Invoice button for any non-cancelled order.
+    // Invoice + Bon for any non-cancelled order.
     if (o.status !== 'cancelled') {
+      actions += `<button class="btn btn-sm" data-bon="${o.id}">🍳 Bon</button>`;
       actions += `<button class="btn btn-sm" data-invoice="${o.id}">🧾 Račun</button>`;
     }
 
@@ -260,6 +299,12 @@
     });
     document.querySelectorAll('[data-table-bill]').forEach((btn) => {
       btn.addEventListener('click', () => Invoice.openForTable(btn.dataset.tableBill, btn.dataset.label));
+    });
+    document.querySelectorAll('[data-bon]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const o = orders.find((x) => x.id === btn.dataset.bon);
+        if (o) printBon(o);
+      });
     });
     document.querySelectorAll('[data-act]').forEach((btn) => {
       btn.addEventListener('click', async () => {

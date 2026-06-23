@@ -164,8 +164,14 @@
       ? `<img class="item-thumb" loading="lazy" src="${esc(item.image_url)}" alt="${esc(item.name)}" />`
       : `<div class="item-thumb placeholder">🍽️</div>`;
 
+    const hasVariants = Array.isArray(item.variants) && item.variants.length > 0;
     const qty = Cart.quantityOf(item.id);
-    const controls = orderable ? `
+    let controls;
+    if (!orderable) controls = `<span class="na-badge">${soldOut ? 'Razprodano' : 'Ni na voljo'}</span>`;
+    else if (hasVariants) controls = `
+      <div class="variant-row">${item.variants.map((v, i) => `
+        <button class="variant-chip" data-vi="${i}">${esc(v.name)} · ${formatPrice(v.price, tenant.currency)}</button>`).join('')}</div>`;
+    else controls = `
       <div class="stepper${qty > 0 ? ' has-qty' : ''}" data-id="${item.id}">
         <button class="step-btn add add-only" aria-label="Dodaj">＋</button>
         <div class="qty-controls">
@@ -173,7 +179,7 @@
           <span class="step-qty">${qty}</span>
           <button class="step-btn add plus" aria-label="Dodaj">＋</button>
         </div>
-      </div>` : `<span class="na-badge">${soldOut ? 'Razprodano' : 'Ni na voljo'}</span>`;
+      </div>`;
 
     card.innerHTML = `
       ${thumb}
@@ -182,12 +188,18 @@
         ${item.description ? `<div class="item-desc">${esc(item.description)}</div>` : ''}
         ${item.allergens ? `<div class="item-allergens">⚠️ ${esc(item.allergens)}</div>` : ''}
         <div class="item-bottom">
-          <span class="item-price">${formatPrice(item.price, tenant.currency)}</span>
+          <span class="item-price">${hasVariants ? 'od ' : ''}${formatPrice(hasVariants ? Math.min(...item.variants.map((v) => v.price)) : item.price, tenant.currency)}</span>
           ${controls}
         </div>
       </div>`;
 
-    if (orderable) {
+    if (orderable && hasVariants) {
+      card.querySelectorAll('.variant-chip').forEach((chip) => chip.addEventListener('click', () => {
+        const v = item.variants[Number(chip.dataset.vi)];
+        Cart.add({ id: `${item.id}|${v.name}`, menu_item_id: item.id, name: `${item.name} – ${v.name}`, price: v.price });
+        pulse(card);
+      }));
+    } else if (orderable) {
       const stepper = card.querySelector('.stepper');
       const addItem = () => {
         // Do not let a customer order more than the available stock.
@@ -334,7 +346,7 @@
 
       const rows = items.map((it) => ({
         order_id: orderId,
-        menu_item_id: it.id,
+        menu_item_id: it.menu_item_id || it.id,
         tenant_id: tenant.id,
         item_name: it.name,
         item_price: it.price,
