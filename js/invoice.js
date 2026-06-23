@@ -332,10 +332,24 @@ const Invoice = (() => {
       <div id="receipt-print-area">${receiptHTML(inv, tableLabel, qrImg)}</div>
       <div class="modal-actions no-print">
         <button class="btn" id="inv-close2">Zapri</button>
+        ${(inv.id && inv.doc_type !== 'storno' && !inv.voided_by_invoice_id) ? '<button class="btn btn-danger" id="inv-storno">Storno</button>' : ''}
         <button class="btn btn-primary" id="inv-print">🖨 Natisni</button>
       </div>`;
     document.getElementById('inv-close2').addEventListener('click', close);
     document.getElementById('inv-print').addEventListener('click', () => printReceipt(inv, tableLabel, qrImg));
+    const stornoBtn = document.getElementById('inv-storno');
+    if (stornoBtn) stornoBtn.addEventListener('click', () => storno(inv.id, inv.table_id, tableLabel));
+  }
+
+  // Odpre obstoječ račun (npr. iz Zgodovine) — prikaz + tisk + storno.
+  async function openInvoice(invoiceId, tableLabel) {
+    ensureModal();
+    document.getElementById('invoice-modal').classList.add('open');
+    const body = document.getElementById('inv-body');
+    body.innerHTML = '<div class="spinner"></div>';
+    const { data, error } = await sb.from('invoices').select('*').eq('id', invoiceId).maybeSingle();
+    if (error || !data) { body.innerHTML = '<p class="muted">Računa ni mogoče naložiti.</p>'; return; }
+    showReceipt(data, tableLabel);
   }
 
   // Pokliče Edge funkcijo za davčno potrjevanje (samo če je FURS vklopljen).
@@ -569,7 +583,7 @@ const Invoice = (() => {
   `;
   }
 
-  return { open, openForTable, close };
+  return { open, openForTable, openInvoice, close };
 })();
 
 window.Invoice = Invoice;

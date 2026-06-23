@@ -21,6 +21,7 @@
     (tbs || []).forEach((t) => { tablesById[t.id] = t; });
 
     renderControls(tbs || []);
+    window.addEventListener('epo:invoiced', load);
     const today = new Date().toISOString().slice(0, 10);
     document.getElementById('f-from').value = today;
     document.getElementById('f-to').value = today;
@@ -51,7 +52,9 @@
         </div>
       </div>
       <div class="stats-row" id="stats"></div>
-      <div id="results"></div>`;
+      <div id="results"></div>
+      <h2 style="margin-top:24px">Izdani računi</h2>
+      <div id="inv-results"></div>`;
     document.getElementById('apply').addEventListener('click', load);
   }
 
@@ -73,6 +76,35 @@
     rows = (data || []).map((o) => ({ ...o, items: o.order_items || [] }));
     renderStats();
     renderResults();
+    loadInvoices(from, to, tableId);
+  }
+
+  async function loadInvoices(from, to, tableId) {
+    let q = sb.from('invoices').select('*').eq('tenant_id', tenant.id).order('issued_at', { ascending: false });
+    if (from) q = q.gte('issued_at', new Date(from + 'T00:00:00').toISOString());
+    if (to) q = q.lte('issued_at', new Date(to + 'T23:59:59').toISOString());
+    if (tableId) q = q.eq('table_id', tableId);
+    const { data, error } = await q;
+    const host = document.getElementById('inv-results');
+    if (error) { host.innerHTML = `<p class="muted">Računov ni mogoče naložiti (${esc(error.message)}). Ste zagnali migracije?</p>`; return; }
+    const invs = data || [];
+    if (!invs.length) { host.innerHTML = '<p class="muted">Ni izdanih računov za izbrane filtre.</p>'; return; }
+    host.innerHTML = `
+      <div class="card glass" style="overflow-x:auto">
+        <table class="data-table">
+          <thead><tr><th>Št. računa</th><th>Čas</th><th>Plačilo</th><th class="r">Znesek</th><th></th></tr></thead>
+          <tbody>${invs.map((v) => `
+            <tr>
+              <td><strong>${esc(v.invoice_number)}</strong>${v.doc_type === 'storno' ? ' <span class="badge badge-cancelled">STORNO</span>' : ''}${v.voided_by_invoice_id ? ' <span class="muted">storniran</span>' : ''}</td>
+              <td>${formatDateTime(v.issued_at)}</td>
+              <td>${esc(v.payment_method || '')}</td>
+              <td class="r"><strong>${formatPrice(v.gross_total, tenant.currency)}</strong></td>
+              <td class="r"><button class="btn btn-sm" data-inv="${v.id}">Odpri / Storno</button></td>
+            </tr>`).join('')}</tbody>
+        </table>
+      </div>`;
+    host.querySelectorAll('[data-inv]').forEach((b) =>
+      b.addEventListener('click', () => Invoice.openInvoice(b.dataset.inv)));
   }
 
   function renderStats() {
