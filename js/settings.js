@@ -73,14 +73,17 @@
         <p class="muted">Povabite osebje. Po registraciji jih povežite z restavracijo.</p>
         <div id="staff-list"></div>
         ${isOwner ? `
-        <div class="row wrap" style="margin-top:14px;align-items:flex-end">
-          <div class="field" style="flex:1;margin:0"><label>E-pošta novega uporabnika</label><input class="input" type="email" id="invite-email" placeholder="ime@example.com" /></div>
-          <div class="field" style="width:140px;margin:0"><label>Vloga</label>
-            <select class="select" id="invite-role"><option value="staff">Osebje</option><option value="admin">Admin</option></select>
+        <h3 style="margin:16px 0 8px">Dodaj natakarja / osebje</h3>
+        <div class="row wrap" style="align-items:flex-end">
+          <div class="field" style="flex:1;min-width:160px;margin:0"><label>E-pošta</label><input class="input" type="email" id="invite-email" placeholder="ime@example.com" /></div>
+          <div class="field" style="width:130px;margin:0"><label>Ime</label><input class="input" id="invite-name" placeholder="Ime Priimek" /></div>
+          <div class="field" style="width:100px;margin:0"><label>Šifra</label><input class="input" id="invite-code" placeholder="N1" /></div>
+          <div class="field" style="width:120px;margin:0"><label>Vloga</label>
+            <select class="select" id="invite-role"><option value="staff">Natakar</option><option value="admin">Admin</option></select>
           </div>
           <button class="btn btn-primary" id="invite-btn">Povabi</button>
         </div>
-        <div class="muted" style="font-size:.8rem;margin-top:8px">Povabilo pošlje e-pošto za potrditev. Po potrditvi se uporabnik samodejno poveže z vašo restavracijo.</div>
+        <div class="muted" style="font-size:.8rem;margin-top:8px">Natakar po prijavi vidi samo »Naročila« in »Novo naročilo«. Šifra natakarja se izpiše na računu. Povabilo pošlje e-pošto za potrditev gesla.</div>
         ` : ''}
       </div>`;
 
@@ -192,18 +195,35 @@
     const { data, error } = await sb.from('profiles').select('*').eq('tenant_id', tenant.id);
     const host = document.getElementById('staff-list');
     if (error || !data) { host.innerHTML = '<p class="muted">Ni mogoče naložiti osebja.</p>'; return; }
+    const canEdit = profile.role === 'owner' || profile.role === 'admin';
     host.innerHTML = data.map((p) => `
       <div class="list-card" style="background:var(--surface)">
         <div class="grow">
           <div class="title">${esc(p.full_name || '(brez imena)')}${p.id === profile.id ? ' <span class="muted">(vi)</span>' : ''}</div>
-          <div class="sub">Vloga: ${esc(p.role)}</div>
+          <div class="sub">Vloga: ${esc(p.role === 'staff' ? 'natakar' : p.role)}</div>
         </div>
+        ${canEdit ? `
+          <div class="row" style="gap:6px">
+            <input class="input staff-code" data-id="${p.id}" value="${esc(p.staff_code || '')}" placeholder="šifra" style="width:90px" />
+            <button class="btn btn-sm staff-code-save" data-id="${p.id}">Shrani</button>
+          </div>` : `<span class="muted">Šifra: ${esc(p.staff_code || '—')}</span>`}
       </div>`).join('');
+    host.querySelectorAll('.staff-code-save').forEach((b) => b.addEventListener('click', async () => {
+      const id = b.dataset.id;
+      const code = host.querySelector(`.staff-code[data-id="${id}"]`).value.trim() || null;
+      b.disabled = true;
+      const { error } = await sb.from('profiles').update({ staff_code: code }).eq('id', id);
+      b.disabled = false;
+      if (error) { console.error(error); toast('Napaka: ' + error.message, 'error', 6000); return; }
+      toast('Šifra shranjena.', 'success');
+    }));
   }
 
   async function invite() {
     const email = document.getElementById('invite-email').value.trim();
     const role = document.getElementById('invite-role').value;
+    const fullName = document.getElementById('invite-name').value.trim();
+    const code = document.getElementById('invite-code').value.trim();
     if (!email) return toast('Vnesite e-pošto.', 'error');
     // Sign up the new user via an ISOLATED client so the admin's own session is
     // not replaced. They receive a confirmation email; the on_auth_user_created
@@ -215,11 +235,17 @@
     const { error } = await tmp.auth.signUp({
       email,
       password: crypto.randomUUID(),  // temporary; user resets via email
-      options: { data: { invited_tenant_id: tenant.id, invited_role: role } },
+      options: { data: {
+        invited_tenant_id: tenant.id, invited_role: role,
+        full_name: fullName || null, invited_staff_code: code || null,
+      } },
     });
     if (error) { console.error(error); return toast('Napaka pri vabilu: ' + error.message, 'error'); }
     toast('Povabilo poslano na ' + email, 'success', 5000);
     document.getElementById('invite-email').value = '';
+    document.getElementById('invite-name').value = '';
+    document.getElementById('invite-code').value = '';
+    loadStaff();
   }
 
   document.addEventListener('DOMContentLoaded', init);

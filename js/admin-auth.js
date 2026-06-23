@@ -4,8 +4,8 @@
 // ============================================================================
 
 const NAV = [
-  { href: '/admin/dashboard.html', icon: '📋', label: 'Naročila', key: 'dashboard', badge: true },
-  { href: '/admin/new-order.html', icon: '➕', label: 'Novo',     key: 'neworder' },
+  { href: '/admin/dashboard.html', icon: '📋', label: 'Naročila', key: 'dashboard', badge: true, staff: true },
+  { href: '/admin/new-order.html', icon: '➕', label: 'Novo',     key: 'neworder', staff: true },
   { href: '/admin/menu.html',      icon: '🍽️', label: 'Meni',     key: 'menu' },
   { href: '/admin/inventory.html', icon: '📦', label: 'Zaloge',   key: 'inventory' },
   { href: '/admin/tables.html',    icon: '🪑', label: 'Mize',     key: 'tables' },
@@ -43,14 +43,18 @@ const AdminShell = (() => {
     const shell = document.getElementById('admin-shell');
     if (!shell) return;
 
-    const navLinks = NAV.map((n) => `
+    // Natakar (staff) vidi le naročila in novo naročilo.
+    const isStaff = profile?.role === 'staff';
+    const items = NAV.filter((n) => !isStaff || n.staff);
+
+    const navLinks = items.map((n) => `
       <a class="nav-link ${n.key === activeKey ? 'active' : ''}" href="${n.href}">
         <span class="icon">${n.icon}</span>
         <span>${n.label}</span>
         ${n.badge ? `<span class="pill hidden" id="nav-badge-${n.key}"></span>` : ''}
       </a>`).join('');
 
-    const bottomLinks = NAV.map((n) => `
+    const bottomLinks = items.map((n) => `
       <a class="${n.key === activeKey ? 'active' : ''}" href="${n.href}" style="position:relative">
         <span class="icon">${n.icon}</span>
         <span>${n.label}</span>
@@ -94,9 +98,15 @@ const AdminShell = (() => {
   }
 
   // Convenience: full init for a page.
+  const STAFF_KEYS = ['dashboard', 'neworder'];
   async function init(activeKey, title) {
     const ctx = await requireAuth();
     if (!ctx) return null;
+    // Natakar nima dostopa do drugih strani — preusmeri na naročila.
+    if (ctx.profile.role === 'staff' && !STAFF_KEYS.includes(activeKey)) {
+      location.replace('/admin/dashboard.html');
+      return null;
+    }
     render(activeKey, title);
     return ctx;
   }

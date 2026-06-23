@@ -375,7 +375,7 @@ const Invoice = (() => {
         <div class="rcpt-row"><span>Št. računa:</span><span><strong>${esc(inv.invoice_number)}</strong></span></div>
         <div class="rcpt-row"><span>Datum in čas:</span><span>${formatDateTime(inv.issued_at)}</span></div>
         ${tableLabel ? `<div class="rcpt-row"><span>Miza:</span><span>${esc(tableLabel)}</span></div>` : ''}
-        ${inv.operator_name ? `<div class="rcpt-row"><span>Operater:</span><span>${esc(inv.operator_name)}</span></div>` : ''}
+        ${(inv.operator_code || inv.operator_name) ? `<div class="rcpt-row"><span>Natakar:</span><span>${esc(inv.operator_code || inv.operator_name)}</span></div>` : ''}
 
         <table class="rcpt-table">
           <thead><tr>
@@ -457,7 +457,7 @@ const Invoice = (() => {
       <div class="t-row"><span>Št.:</span><span>${esc(inv.invoice_number)}</span></div>
       <div class="t-row"><span>Datum:</span><span>${formatDateTime(inv.issued_at)}</span></div>
       ${tableLabel ? `<div class="t-row"><span>Miza:</span><span>${esc(tableLabel)}</span></div>` : ''}
-      ${inv.operator_name ? `<div class="t-row"><span>Operater:</span><span>${esc(inv.operator_name)}</span></div>` : ''}
+      ${(inv.operator_code || inv.operator_name) ? `<div class="t-row"><span>Natakar:</span><span>${esc(inv.operator_code || inv.operator_name)}</span></div>` : ''}
       <div class="hr"></div>
       ${items}
       ${vat}
