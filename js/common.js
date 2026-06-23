@@ -2,6 +2,27 @@
 // EPO.SI — Shared helpers (toasts, formatting, branding, time)
 // ============================================================================
 
+// --- PWA: manifest link + service worker registration -----------------------
+(function registerPwa() {
+  try {
+    if (!document.querySelector('link[rel="manifest"]')) {
+      const l = document.createElement('link');
+      l.rel = 'manifest';
+      l.href = '/manifest.webmanifest';
+      document.head.appendChild(l);
+    }
+    if (!document.querySelector('link[rel="apple-touch-icon"]')) {
+      const a = document.createElement('link');
+      a.rel = 'apple-touch-icon';
+      a.href = '/assets/icon-192.png';
+      document.head.appendChild(a);
+    }
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+    }
+  } catch {}
+})();
+
 // --- Toast notifications ----------------------------------------------------
 function toast(message, type = '', timeout = 3200) {
   let host = document.getElementById('toast-host');

@@ -6,6 +6,8 @@
   <meta name="theme-color" content="#0a0b14" />
   <title>EPO.SI — Digitalni meni in naročanje za mizo</title>
   <meta name="description" content="EPO.SI — digitalni meni in naročanje za mizo za bare, restavracije in kavarne." />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="/assets/icon-192.png" />
   <link rel="stylesheet" href="/css/common.css" />
   <style>
     .landing {
@@ -46,5 +48,10 @@
       </div>
     </div>
   </div>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () { navigator.serviceWorker.register('/sw.js').catch(function () {}); });
+    }
+  </script>
 </body>
 </html>
