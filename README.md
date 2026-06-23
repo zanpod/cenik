@@ -4,6 +4,9 @@ Multi-tenant digitalni meni in sistem za naročanje za bare, restavracije in
 kavarne. Gost skenira QR kodo na mizi, brska po meniju in odda naročilo; osebje
 naročila vidi v realnem času na admin nadzorni plošči, urejena po mizah.
 
+> Podrobna tehnična dokumentacija (arhitektura, podatkovni model, varnost,
+> moduli) je v [`docs/TECHNICAL.md`](docs/TECHNICAL.md).
+
 - **Frontend:** čisti HTML/CSS/JS (brez ogrodij, brez build koraka) → Netlify
 - **Backend:** Supabase (PostgreSQL, Auth, Realtime, Storage)
 - **Oblika:** temna tema, glassmorphism, modro-vijolični gradienti, mobile-first
