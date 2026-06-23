@@ -188,6 +188,7 @@ const Invoice = (() => {
         if (isNaN(q) || q < 0) q = 0;
         return Math.min(q, max);
       };
+      let grandTotal = 0;
       const recalc = () => {
         let sum = 0;
         rows().forEach((row) => {
@@ -199,9 +200,22 @@ const Invoice = (() => {
         });
         document.getElementById('bill-sum').textContent = formatPrice(sum, cur);
         const disc = Math.min(100, Math.max(0, Number(document.getElementById('bill-disc').value) || 0));
-        const grand = Math.round(sum * (1 - disc / 100) * 100) / 100;
-        document.getElementById('bill-grand').textContent = formatPrice(grand, cur);
+        grandTotal = Math.round(sum * (1 - disc / 100) * 100) / 100;
+        document.getElementById('bill-grand').textContent = formatPrice(grandTotal, cur);
       };
+
+      // Deljeno plačilo: ob vnosu enega zneska samodejno izračuna razliko.
+      const fld = (id) => document.getElementById(id);
+      const val = (id) => Math.max(0, Number(fld(id).value) || 0);
+      const setVal = (id, n) => { fld(id).value = (Math.round(Math.max(0, n) * 100) / 100).toFixed(2); };
+      const autoSplit = (changed) => {
+        const cash = val('bill-cash'), card = val('bill-card'), other = val('bill-other');
+        if (changed === 'cash') setVal('bill-card', grandTotal - cash - other);
+        else if (changed === 'card') setVal('bill-cash', grandTotal - card - other);
+        else setVal('bill-cash', grandTotal - other - card);
+      };
+      ['cash', 'card', 'other'].forEach((k) =>
+        fld('bill-' + k).addEventListener('input', () => autoSplit(k)));
       rows().forEach((row) => {
         const input = row.querySelector('.bill-qty-in');
         const cb = row.querySelector('.bill-cb');
@@ -225,7 +239,9 @@ const Invoice = (() => {
       });
       document.getElementById('bill-disc').addEventListener('input', recalc);
       document.getElementById('inv-pay').addEventListener('change', (e) => {
-        document.getElementById('bill-split').classList.toggle('hidden', e.target.value !== 'mesano');
+        const split = e.target.value === 'mesano';
+        document.getElementById('bill-split').classList.toggle('hidden', !split);
+        if (split) { recalc(); setVal('bill-cash', grandTotal); setVal('bill-card', 0); setVal('bill-other', 0); }
       });
       document.getElementById('bill-issue').addEventListener('click', () => issueSelected(tableId, tableLabel));
       recalc();
