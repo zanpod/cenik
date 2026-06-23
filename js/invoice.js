@@ -138,9 +138,10 @@ const Invoice = (() => {
         <h3>Izdani računi mize</h3>
         ${invs.map((v) => `
           <div class="row" style="padding:6px 0;border-bottom:1px solid var(--glass-border)">
-            <span><strong>${esc(v.invoice_number)}</strong> · ${formatPrice(v.gross_total, cur)}
-              <span class="muted">(${esc(payLabel(v.payment_method))})</span></span>
-            <button class="btn btn-sm" data-reprint="${v.id}" style="margin-left:auto">🖨 Ponovni tisk</button>
+            <span><strong>${esc(v.invoice_number)}</strong>${v.doc_type === 'storno' ? ' <span class="badge badge-cancelled">STORNO</span>' : ''} · ${formatPrice(v.gross_total, cur)}
+              <span class="muted">(${esc(payLabel(v.payment_method))})</span>${v.voided_by_invoice_id ? ' <span class="muted">— storniran</span>' : ''}</span>
+            <button class="btn btn-sm" data-reprint="${v.id}" style="margin-left:auto">🖨</button>
+            ${(v.doc_type !== 'storno' && !v.voided_by_invoice_id) ? `<button class="btn btn-sm btn-danger" data-storno="${v.id}">Storno</button>` : ''}
           </div>`).join('')}
       </div>` : '';
 
@@ -155,15 +156,24 @@ const Invoice = (() => {
           <strong id="bill-sum"></strong>
         </div>
         <div class="bill-list">${lines}</div>
-        <div class="field" style="margin-top:12px">
-          <label>Način plačila</label>
-          <select class="select" id="inv-pay">
-            <option value="gotovina">Gotovina</option>
-            <option value="kartica">Kartica</option>
-            <option value="drugo">Drugo</option>
-          </select>
+        <div class="row wrap" style="margin-top:12px">
+          <div class="field" style="width:120px;margin:0"><label>Popust (%)</label><input class="input" type="number" min="0" max="100" step="1" id="bill-disc" value="0" /></div>
+          <div class="field" style="width:120px;margin:0"><label>Napitnina</label><input class="input" type="number" min="0" step="0.01" id="bill-tip" value="0" /></div>
+          <div class="field" style="flex:1;min-width:140px;margin:0"><label>Način plačila</label>
+            <select class="select" id="inv-pay">
+              <option value="gotovina">Gotovina</option>
+              <option value="kartica">Kartica</option>
+              <option value="drugo">Drugo</option>
+              <option value="mesano">Deljeno (gotovina + kartica)</option>
+            </select>
+          </div>
         </div>
-        <div class="muted" style="font-size:.8rem;margin:4px 0 12px">Plačane postavke se obračunajo; ko je plačano vse, se miza zapre (gre v »postreženo«).</div>
+        <div id="bill-split" class="row wrap hidden" style="margin-top:8px">
+          <div class="field" style="flex:1;margin:0"><label>Gotovina</label><input class="input" type="number" min="0" step="0.01" id="bill-cash" value="0" /></div>
+          <div class="field" style="flex:1;margin:0"><label>Kartica</label><input class="input" type="number" min="0" step="0.01" id="bill-card" value="0" /></div>
+          <div class="field" style="flex:1;margin:0"><label>Drugo</label><input class="input" type="number" min="0" step="0.01" id="bill-other" value="0" /></div>
+        </div>
+        <div class="muted" style="font-size:.8rem;margin:8px 0 12px">Za plačilo: <strong id="bill-grand"></strong>. Ko je plačano vse, se miza zapre.</div>
         <button class="btn btn-primary btn-block" id="bill-issue">Obračunaj izbrano</button>
       ` : '<div class="empty-state"><div class="emoji">✅</div><p>Ni neobračunanih postavk za to mizo.</p></div>'}
       ${invList}`;
@@ -188,6 +198,9 @@ const Invoice = (() => {
           sum += amt;
         });
         document.getElementById('bill-sum').textContent = formatPrice(sum, cur);
+        const disc = Math.min(100, Math.max(0, Number(document.getElementById('bill-disc').value) || 0));
+        const grand = Math.round(sum * (1 - disc / 100) * 100) / 100;
+        document.getElementById('bill-grand').textContent = formatPrice(grand, cur);
       };
       rows().forEach((row) => {
         const input = row.querySelector('.bill-qty-in');
@@ -210,6 +223,10 @@ const Invoice = (() => {
         rows().forEach((row) => { row.querySelector('.bill-cb').checked = false; });
         recalc();
       });
+      document.getElementById('bill-disc').addEventListener('input', recalc);
+      document.getElementById('inv-pay').addEventListener('change', (e) => {
+        document.getElementById('bill-split').classList.toggle('hidden', e.target.value !== 'mesano');
+      });
       document.getElementById('bill-issue').addEventListener('click', () => issueSelected(tableId, tableLabel));
       recalc();
     }
@@ -218,6 +235,18 @@ const Invoice = (() => {
         const v = invs.find((x) => x.id === b.dataset.reprint);
         if (v) showReceipt(v, tableLabel);
       }));
+    body.querySelectorAll('[data-storno]').forEach((b) =>
+      b.addEventListener('click', () => storno(b.dataset.storno, tableId, tableLabel)));
+  }
+
+  async function storno(invoiceId, tableId, tableLabel) {
+    if (!confirm('Storniram ta račun? Izda se dobropis (negativen račun), postavke se znova odprejo.')) return;
+    const { data, error } = await sb.rpc('storno_invoice', { p_invoice_id: invoiceId });
+    if (error) { console.error(error); toast('Napaka pri storno: ' + (error.message || ''), 'error', 6000); return; }
+    const inv = Array.isArray(data) ? data[0] : data;
+    window.dispatchEvent(new CustomEvent('epo:invoiced'));
+    toast('Račun storniran.', 'success');
+    showReceipt(inv, tableLabel);
   }
 
   async function issueSelected(tableId, tableLabel) {
@@ -230,11 +259,20 @@ const Invoice = (() => {
       if (q > 0) lines.push({ id: row.dataset.id, qty: q });
     });
     if (!lines.length) { toast('Izberite vsaj eno postavko.', 'error'); return; }
+    const pay = document.getElementById('inv-pay').value;
+    const disc = Math.min(100, Math.max(0, Number(document.getElementById('bill-disc').value) || 0));
+    const tip = Math.max(0, Number(document.getElementById('bill-tip').value) || 0);
+    const split = pay === 'mesano';
     const btn = document.getElementById('bill-issue');
     btn.disabled = true; btn.textContent = 'Obračunavam…';
     const { data, error } = await sb.rpc('issue_invoice_for_quantities', {
       p_lines: lines,
-      p_payment_method: document.getElementById('inv-pay').value,
+      p_payment_method: split ? 'gotovina' : pay,
+      p_discount_pct: disc,
+      p_tip: tip,
+      p_cash: split ? (Number(document.getElementById('bill-cash').value) || 0) : null,
+      p_card: split ? (Number(document.getElementById('bill-card').value) || 0) : null,
+      p_other: split ? (Number(document.getElementById('bill-other').value) || 0) : null,
     });
     if (error) {
       console.error(error);
@@ -371,7 +409,8 @@ const Invoice = (() => {
           ${sellerVat}
         </div>
 
-        <div class="rcpt-title">RAČUN</div>
+        <div class="rcpt-title">${inv.doc_type === 'storno' ? 'STORNO' : 'RAČUN'}</div>
+        ${inv.ref_invoice_number ? `<div class="rcpt-row"><span>Sklic na račun:</span><span>${esc(inv.ref_invoice_number)}</span></div>` : ''}
         <div class="rcpt-row"><span>Št. računa:</span><span><strong>${esc(inv.invoice_number)}</strong></span></div>
         <div class="rcpt-row"><span>Datum in čas:</span><span>${formatDateTime(inv.issued_at)}</span></div>
         ${tableLabel ? `<div class="rcpt-row"><span>Miza:</span><span>${esc(tableLabel)}</span></div>` : ''}
@@ -392,11 +431,16 @@ const Invoice = (() => {
           <tfoot><tr><td>Skupaj</td><td class="r">${formatPrice(inv.net_total, cur)}</td><td class="r">${formatPrice(inv.vat_total, cur)}</td></tr></tfoot>
         </table>` : ''}
 
+        ${Number(inv.discount_amount) > 0 ? `<div class="rcpt-row"><span>Popust ${Number(inv.discount_pct).toFixed(0)}%</span><span>-${formatPrice(inv.discount_amount, cur)}</span></div>` : ''}
         <div class="rcpt-total">
           <span>ZA PLAČILO</span>
           <span>${formatPrice(inv.gross_total, cur)}</span>
         </div>
-        <div class="rcpt-row"><span>Način plačila:</span><span>${esc(payLabel(inv.payment_method))}</span></div>
+        ${[['Gotovina', inv.amount_cash], ['Kartica', inv.amount_card], ['Drugo', inv.amount_other]]
+          .filter(([, v]) => Number(v) > 0)
+          .map(([k, v]) => `<div class="rcpt-row"><span>${k}</span><span>${formatPrice(v, cur)}</span></div>`).join('')
+          || `<div class="rcpt-row"><span>Način plačila</span><span>${esc(payLabel(inv.payment_method))}</span></div>`}
+        ${Number(inv.tip_amount) > 0 ? `<div class="rcpt-row"><span>Napitnina</span><span>${formatPrice(inv.tip_amount, cur)}</span></div>` : ''}
 
         <div class="rcpt-fiscal">${fiscalBlock}</div>
 
@@ -447,22 +491,36 @@ const Invoice = (() => {
       <div class="t-small">EOR: ${esc(inv.eor || '')}</div>` : `
       <div class="t-test">TESTNI RAČUN<br>NI DAVČNO POTRJEN (ZDavPR)</div>`;
 
+    const pays = [];
+    if (Number(inv.amount_cash) > 0) pays.push(['Gotovina', inv.amount_cash]);
+    if (Number(inv.amount_card) > 0) pays.push(['Kartica', inv.amount_card]);
+    if (Number(inv.amount_other) > 0) pays.push(['Drugo', inv.amount_other]);
+    if (!pays.length) pays.push([payLabel(inv.payment_method), inv.gross_total]);
+    const payRows = pays.map(([k, v]) => `<div class="t-row"><span>${k}:</span><span>${price(v)} ${c}</span></div>`).join('');
+    const discRow = Number(inv.discount_amount) > 0
+      ? `<div class="t-row"><span>Popust ${Number(inv.discount_pct).toFixed(0)}%:</span><span>-${price(inv.discount_amount)} ${c}</span></div>` : '';
+    const tipRow = Number(inv.tip_amount) > 0
+      ? `<div class="t-row"><span>Napitnina:</span><span>${price(inv.tip_amount)} ${c}</span></div>` : '';
+
     return `
       ${logo ? `<div class="t-qr"><img class="t-logo" src="${esc(logo)}" alt=""></div>` : ''}
       <div class="t-center t-name">${esc(inv.seller_name || '')}</div>
       ${inv.seller_address ? `<div class="t-center t-small">${esc(inv.seller_address)}</div>` : ''}
       <div class="t-center t-small">${inv.seller_vat_registered ? 'ID za DDV: SI' : 'Davčna št.: '}${esc((inv.seller_tax_number || '').replace(/^SI/i, ''))}</div>
 
-      <div class="t-title">RAČUN</div>
+      <div class="t-title">${inv.doc_type === 'storno' ? 'STORNO' : 'RAČUN'}</div>
       <div class="t-row"><span>Št.:</span><span>${esc(inv.invoice_number)}</span></div>
+      ${inv.ref_invoice_number ? `<div class="t-row"><span>Sklic:</span><span>${esc(inv.ref_invoice_number)}</span></div>` : ''}
       <div class="t-row"><span>Datum:</span><span>${formatDateTime(inv.issued_at)}</span></div>
       ${tableLabel ? `<div class="t-row"><span>Miza:</span><span>${esc(tableLabel)}</span></div>` : ''}
       ${(inv.operator_code || inv.operator_name) ? `<div class="t-row"><span>Natakar:</span><span>${esc(inv.operator_code || inv.operator_name)}</span></div>` : ''}
       <div class="hr"></div>
       ${items}
+      ${discRow}
       ${vat}
       <div class="t-total"><span>ZA PLAČILO</span><span>${price(inv.gross_total)} ${c}</span></div>
-      <div class="t-row"><span>Plačilo:</span><span>${esc(payLabel(inv.payment_method))}</span></div>
+      ${payRows}
+      ${tipRow}
       <div class="hr"></div>
       ${fiscal}
       <div class="t-center t-small" style="margin-top:6px">Hvala in nasvidenje!</div>`;
