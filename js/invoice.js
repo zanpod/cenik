@@ -408,20 +408,23 @@ const Invoice = (() => {
     return ({ gotovina: 'Gotovina', kartica: 'Kartica', drugo: 'Drugo' })[m] || (m || '—');
   }
 
-  // --- Print: ozek izpis za male (Bluetooth) termalne tiskalnike, 58 mm ------
+  // --- Print: ozek izpis za male (Bluetooth) termalne tiskalnike (58/80 mm) --
   function printReceipt(inv, tableLabel, qrImg) {
-    const w = window.open('', '_blank', 'width=360,height=640');
+    const t = (window.AdminShell && AdminShell.tenant) || {};
+    const width = Number(t.receipt_width) === 80 ? 80 : 58;
+    const logo = t.logo_url || '';
+    const w = window.open('', '_blank', 'width=380,height=640');
     if (!w) { toast('Brskalnik je blokiral pojavno okno za tisk.', 'error'); return; }
     w.document.write(`<!DOCTYPE html><html lang="sl"><head><meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1">
       <title>Račun ${esc(inv.invoice_number)}</title>
-      <style>${PRINT_CSS}</style></head>
-      <body onload="setTimeout(function(){window.print();},150)">${thermalReceiptHTML(inv, tableLabel, qrImg)}</body></html>`);
+      <style>${printCss(width)}</style></head>
+      <body onload="setTimeout(function(){window.print();},200)">${thermalReceiptHTML(inv, tableLabel, qrImg, logo)}</body></html>`);
     w.document.close();
   }
 
   // Ozka, enobarvna, monospace postavitev (zanesljiva za termalne tiskalnike).
-  function thermalReceiptHTML(inv, tableLabel, qrImg) {
+  function thermalReceiptHTML(inv, tableLabel, qrImg, logo) {
     const c = inv.currency || '€';
     const price = (n) => Number(n || 0).toFixed(2).replace('.', ',');
 
@@ -445,6 +448,7 @@ const Invoice = (() => {
       <div class="t-test">TESTNI RAČUN<br>NI DAVČNO POTRJEN (ZDavPR)</div>`;
 
     return `
+      ${logo ? `<div class="t-qr"><img class="t-logo" src="${esc(logo)}" alt=""></div>` : ''}
       <div class="t-center t-name">${esc(inv.seller_name || '')}</div>
       ${inv.seller_address ? `<div class="t-center t-small">${esc(inv.seller_address)}</div>` : ''}
       <div class="t-center t-small">${inv.seller_vat_registered ? 'ID za DDV: SI' : 'Davčna št.: '}${esc((inv.seller_tax_number || '').replace(/^SI/i, ''))}</div>
@@ -464,26 +468,32 @@ const Invoice = (() => {
       <div class="t-center t-small" style="margin-top:6px">Hvala in nasvidenje!</div>`;
   }
 
-  const PRINT_CSS = `
-    @page { size: 58mm auto; margin: 0; }
+  function printCss(width) {
+    const w = width === 80 ? 80 : 58;
+    const qr = w === 80 ? 40 : 30;
+    return `
+    @page { size: ${w}mm auto; margin: 0; }
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; background: #fff; }
-    body { width: 58mm; padding: 2mm 2.5mm; color: #000;
-      font-family: 'Courier New', ui-monospace, monospace; font-size: 9pt; line-height: 1.25; }
+    body { width: ${w}mm; padding: 2mm 2.5mm; color: #000;
+      font-family: 'Courier New', ui-monospace, monospace; font-size: ${w === 80 ? '10pt' : '9pt'}; line-height: 1.25; }
     .t-center { text-align: center; }
-    .t-name { font-weight: 700; font-size: 11pt; }
+    .t-name { font-weight: 700; font-size: ${w === 80 ? '13pt' : '11pt'}; }
     .t-small { font-size: 8pt; }
-    .t-title { text-align: center; font-weight: 700; font-size: 12pt; letter-spacing: 2px; margin: 4px 0; }
+    .t-logo { max-width: ${w - 14}mm; max-height: 18mm; filter: grayscale(1) contrast(1.4); margin: 0 auto 2px; }
+    .t-title { text-align: center; font-weight: 700; font-size: ${w === 80 ? '14pt' : '12pt'}; letter-spacing: 2px; margin: 4px 0; }
     .hr { border-top: 1px dashed #000; margin: 4px 0; }
     .t-row { display: flex; justify-content: space-between; gap: 4px; }
     .t-item { margin: 3px 0; }
     .t-iname { font-weight: 700; }
-    .t-total { display: flex; justify-content: space-between; font-weight: 700; font-size: 12pt;
+    .t-total { display: flex; justify-content: space-between; font-weight: 700; font-size: ${w === 80 ? '14pt' : '12pt'};
       border-top: 1px solid #000; border-bottom: 1px solid #000; padding: 3px 0; margin: 4px 0; }
     .t-test { border: 1px dashed #000; padding: 4px; font-size: 8pt; font-weight: 700; text-align: center; margin: 4px 0; }
     .t-qr { text-align: center; margin: 4px 0; }
-    .t-qr img { width: 30mm; height: 30mm; }
+    .t-qr img { width: ${qr}mm; height: ${qr}mm; }
+    .t-qr img.t-logo { width: auto; height: auto; }
   `;
+  }
 
   return { open, openForTable, close };
 })();

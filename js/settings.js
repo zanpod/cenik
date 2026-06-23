@@ -46,6 +46,12 @@
         <div class="row wrap">
           <div class="field" style="flex:1"><label>Oznaka poslovnega prostora</label><input class="input" id="s-premise" value="${esc(tenant.premise_label || 'P1')}" /></div>
           <div class="field" style="flex:1"><label>Oznaka blagajne</label><input class="input" id="s-device" value="${esc(tenant.device_label || 'BL1')}" /></div>
+          <div class="field" style="width:170px"><label>Širina računa (tiskalnik)</label>
+            <select class="select" id="s-rwidth">
+              <option value="58" ${Number(tenant.receipt_width) !== 80 ? 'selected' : ''}>58 mm (mali termalni)</option>
+              <option value="80" ${Number(tenant.receipt_width) === 80 ? 'selected' : ''}>80 mm</option>
+            </select>
+          </div>
         </div>
         <div class="muted" style="font-size:.8rem;margin-bottom:14px">Številka računa bo oblike <code>${esc(tenant.premise_label || 'P1')}-${esc(tenant.device_label || 'BL1')}-N</code> (zaporedno, brez vrzeli).</div>
         <button class="btn btn-primary" id="s-save-fiscal">Shrani podatke za račune</button>
@@ -133,6 +139,7 @@
         default_vat_rate: Number(document.getElementById('s-vatrate').value) || 22,
         premise_label: document.getElementById('s-premise').value.trim() || 'P1',
         device_label: document.getElementById('s-device').value.trim() || 'BL1',
+        receipt_width: Number(document.getElementById('s-rwidth').value) === 80 ? 80 : 58,
       };
       const { error } = await sb.from('tenants').update(payload).eq('id', tenant.id);
       if (error) throw error;
