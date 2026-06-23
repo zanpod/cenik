@@ -4,7 +4,7 @@
 // offline fallback). Static assets = cache-first. Cross-origin (Supabase API,
 // CDN) is never intercepted — data always goes to the network.
 // ============================================================================
-const CACHE = 'epo-v3';
+const CACHE = 'epo-v4';
 const ASSETS = [
   '/', '/index.html',
   '/css/common.css', '/css/menu.css', '/css/admin.css',
@@ -29,27 +29,19 @@ self.addEventListener('activate', (e) => {
     Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
 });
 
+// Network-first za vse iste-izvorne GET zahteve: ko si na spletu, dobiš vedno
+// svežo kodo; predpomnilnik se uporabi le, ko ni povezave. Tako posodobitve
+// takoj zaživijo (brez "obtičale" stare JS/CSS).
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== location.origin) return; // Supabase / CDN → network
 
-  if (req.mode === 'navigate') {
-    e.respondWith(
-      fetch(req).then((res) => {
-        const copy = res.clone();
-        caches.open(CACHE).then((c) => c.put(req, copy));
-        return res;
-      }).catch(() => caches.match(req).then((m) => m || caches.match('/index.html')))
-    );
-    return;
-  }
-
   e.respondWith(
-    caches.match(req).then((cached) => cached || fetch(req).then((res) => {
+    fetch(req).then((res) => {
       if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
       return res;
-    }).catch(() => cached))
+    }).catch(() => caches.match(req).then((m) => m || (req.mode === 'navigate' ? caches.match('/index.html') : undefined)))
   );
 });
