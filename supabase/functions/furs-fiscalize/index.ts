@@ -18,7 +18,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import {
-  computeZOI, buildQrData, buildJWS, parseJWS, fursBaseUrl, fursDateTime, uuid,
+  computeZOI, buildQrData, fursBaseUrl, fursDateTime, uuid, fursPost,
   type FursEnv,
 } from '../_shared/furs.ts';
 
@@ -125,23 +125,19 @@ Deno.serve(async (req) => {
       },
     };
 
-    // 5) Podpiši JWS in pošlji FURS
-    const token = buildJWS(payload, privateKey, certPem);
-    const res = await fetch(`${fursBaseUrl(fursEnv)}/invoices`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json; charset=UTF-8' },
-      body: JSON.stringify({ token }),
-    });
-    const raw = await res.json();
+    // 5) Podpiši JWS in pošlji FURS (z lastno CA verigo, če je nastavljena)
+    const { status, payload: respPayload, raw } = await fursPost(
+      `${fursBaseUrl(fursEnv)}/invoices`, payload, privateKey, certPem,
+    );
+    console.log('FURS invoice response', status, JSON.stringify(raw));
 
     // 6) Razčleni odgovor → EOR
-    const respPayload = raw.token ? parseJWS(raw.token) : raw;
-    const ir = respPayload.InvoiceResponse || {};
+    const ir = respPayload?.InvoiceResponse || {};
     if (ir.Error) {
-      return json({ error: 'furs_error', code: ir.Error.ErrorCode, message: ir.Error.ErrorMessage }, 502);
+      return json({ error: 'furs_error', code: ir.Error.ErrorCode, message: ir.Error.ErrorMessage, zoi }, 502);
     }
     const eor = ir.UniqueInvoiceID;
-    if (!eor) return json({ error: 'EOR ni bil prejet', raw: respPayload }, 502);
+    if (!eor) return json({ error: 'EOR ni bil prejet', status, raw: respPayload, zoi }, 502);
 
     // 7) Posodobi račun
     await admin.from('invoices').update({ zoi, eor, is_fiscal: true }).eq('id', inv.id);

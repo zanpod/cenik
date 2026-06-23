@@ -37,7 +37,15 @@ supabase secrets set FURS_ENABLED=true
 supabase secrets set FURS_ENV=test
 supabase secrets set FURS_PRIVATE_KEY_PEM="$(cat furs_key.pem)"
 supabase secrets set FURS_CERT_PEM="$(cat furs_cert.pem)"
+# Neobvezno, a pogosto potrebno: veriga CA strežnika FURS (sigov-ca / SI-TRUST),
+# sicer lahko klic spodleti z napako preverjanja TLS certifikata.
+supabase secrets set FURS_CA_PEM="$(cat furs_ca_chain.pem)"
 ```
+
+> CA verigo FURS test strežnika (`blagajne-test.fu.gov.si`) dobiš med tehničnimi
+> materiali FURS ali jo izvoziš iz povezave (npr. `openssl s_client -connect
+> blagajne-test.fu.gov.si:9002 -showcerts`). Združi root + vmesne certifikate v
+> en PEM in nastavi kot `FURS_CA_PEM`.
 
 `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` so samodejni.
 

@@ -20,7 +20,7 @@
 // ============================================================================
 
 import {
-  buildJWS, parseJWS, fursBaseUrl, fursDateTime, uuid, type FursEnv,
+  fursBaseUrl, fursDateTime, uuid, fursPost, type FursEnv,
 } from '../_shared/furs.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -106,19 +106,15 @@ Deno.serve(async (req) => {
       },
     };
 
-    const token = buildJWS(payload, privateKey, certPem);
-    const res = await fetch(`${fursBaseUrl(fursEnv)}/invoices/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json; charset=UTF-8' },
-      body: JSON.stringify({ token }),
-    });
-    const raw = await res.json();
-    const respPayload = raw.token ? parseJWS(raw.token) : raw;
-    const br = respPayload.BusinessPremiseResponse || {};
+    const { status, payload: respPayload, raw } = await fursPost(
+      `${fursBaseUrl(fursEnv)}/invoices/register`, payload, privateKey, certPem,
+    );
+    console.log('FURS register response', status, JSON.stringify(raw));
+    const br = respPayload?.BusinessPremiseResponse || {};
     if (br.Error) {
       return json({ error: 'furs_error', code: br.Error.ErrorCode, message: br.Error.ErrorMessage }, 502);
     }
-    return json({ ok: true, response: respPayload });
+    return json({ ok: true, status, response: respPayload });
   } catch (err) {
     console.error(err);
     return json({ error: 'exception', message: String(err?.message || err) }, 500);

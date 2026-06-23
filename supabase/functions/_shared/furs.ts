@@ -123,3 +123,27 @@ export function parseJWS(token: string): any {
 export function uuid(): string {
   return crypto.randomUUID();
 }
+
+// Pošlje podpisano sporočilo na FURS. Če je nastavljen FURS_CA_PEM, uporabi
+// lastno verigo zaupanja (FURS strežnik uporablja sigov-ca / SI-TRUST).
+// Vrne status, razčlenjen payload (iz JWS) in surov odgovor za diagnostiko.
+export async function fursPost(
+  url: string, payload: unknown, privateKeyPem: string, certPem: string,
+): Promise<{ status: number; payload: any; raw: any }> {
+  const token = buildJWS(payload, privateKeyPem, certPem);
+  const opts: RequestInit & { client?: unknown } = {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+    body: JSON.stringify({ token }),
+  };
+  const caPem = Deno.env.get('FURS_CA_PEM');
+  if (caPem) {
+    try { opts.client = (Deno as any).createHttpClient({ caCerts: [caPem] }); }
+    catch (e) { console.error('FURS_CA_PEM client error:', e); }
+  }
+  const res = await fetch(url, opts as RequestInit);
+  const text = await res.text();
+  let raw: any; try { raw = JSON.parse(text); } catch { raw = { text }; }
+  const payloadOut = raw && raw.token ? parseJWS(raw.token) : raw;
+  return { status: res.status, payload: payloadOut, raw };
+}
