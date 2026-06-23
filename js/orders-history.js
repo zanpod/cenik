@@ -12,8 +12,10 @@
     if (!ctx) return;
     tenant = ctx.tenant;
     document.getElementById('header-actions').innerHTML =
+      '<button class="btn btn-sm" id="z-report">📊 Z-poročilo (dan)</button>' +
       '<button class="btn btn-sm" id="export-csv">⬇ Izvozi CSV</button>';
     document.getElementById('export-csv').addEventListener('click', exportCsv);
+    document.getElementById('z-report').addEventListener('click', zReport);
 
     const { data: tbs } = await sb.from('tables').select('*').eq('tenant_id', tenant.id).order('table_number');
     (tbs || []).forEach((t) => { tablesById[t.id] = t; });
@@ -138,6 +140,66 @@
     a.download = `narocila-${tenant.slug}-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(a.href);
+  }
+
+  // --- Z-poročilo: dnevni zaključek prometa iz izdanih računov --------------
+  async function zReport() {
+    const day = document.getElementById('f-from').value || new Date().toISOString().slice(0, 10);
+    const from = new Date(day + 'T00:00:00').toISOString();
+    const to = new Date(day + 'T23:59:59').toISOString();
+    const { data, error } = await sb.from('invoices').select('*')
+      .eq('tenant_id', tenant.id).gte('issued_at', from).lte('issued_at', to)
+      .order('seq');
+    if (error) { console.error(error); toast('Napaka pri nalaganju računov.', 'error'); return; }
+    const invs = data || [];
+    if (!invs.length) { toast('Za izbrani dan ni računov.', 'error'); return; }
+
+    const cur = tenant.currency || '€';
+    let net = 0, vat = 0, gross = 0, cash = 0, card = 0, other = 0, tip = 0, normal = 0, storno = 0;
+    const vatByRate = {};
+    invs.forEach((v) => {
+      net += +v.net_total; vat += +v.vat_total; gross += +v.gross_total;
+      cash += +(v.amount_cash || 0); card += +(v.amount_card || 0); other += +(v.amount_other || 0);
+      tip += +(v.tip_amount || 0);
+      if (v.doc_type === 'storno') storno++; else normal++;
+      (v.vat_breakdown || []).forEach((b) => {
+        const r = Number(b.rate).toFixed(1);
+        vatByRate[r] = vatByRate[r] || { base: 0, vat: 0 };
+        vatByRate[r].base += +b.base; vatByRate[r].vat += +b.vat;
+      });
+    });
+    const money = (n) => Number(n).toFixed(2).replace('.', ',') + ' ' + cur;
+    const vatRows = Object.keys(vatByRate).sort().map((r) =>
+      `<tr><td>${r}%</td><td class="r">${money(vatByRate[r].base)}</td><td class="r">${money(vatByRate[r].vat)}</td></tr>`).join('');
+
+    const html = `<!DOCTYPE html><html lang="sl"><head><meta charset="utf-8"><title>Z-poročilo ${day}</title>
+      <style>
+        body{font-family:-apple-system,Segoe UI,Arial,sans-serif;color:#000;padding:24px;max-width:520px}
+        h1{margin:0} .sub{color:#555;margin-bottom:16px}
+        table{width:100%;border-collapse:collapse;margin:10px 0;font-size:13px}
+        td,th{border:1px solid #ccc;padding:6px 8px}.r{text-align:right}
+        .big{font-size:18px;font-weight:700}
+      </style></head><body onload="window.print()">
+      <h1>Z-poročilo (dnevni promet)</h1>
+      <div class="sub">${esc(tenant.business_name || tenant.name)} — ${day}</div>
+      <table>
+        <tr><td>Število računov</td><td class="r">${normal}${storno ? ' (+' + storno + ' storno)' : ''}</td></tr>
+        <tr><td>Osnova (neto)</td><td class="r">${money(net)}</td></tr>
+        <tr><td>DDV skupaj</td><td class="r">${money(vat)}</td></tr>
+        <tr><td class="big">Promet (bruto)</td><td class="r big">${money(gross)}</td></tr>
+      </table>
+      ${vatRows ? `<table><thead><tr><th>Stopnja</th><th class="r">Osnova</th><th class="r">DDV</th></tr></thead><tbody>${vatRows}</tbody></table>` : ''}
+      <table>
+        <tr><td>Gotovina</td><td class="r">${money(cash)}</td></tr>
+        <tr><td>Kartica</td><td class="r">${money(card)}</td></tr>
+        <tr><td>Drugo</td><td class="r">${money(other)}</td></tr>
+        <tr><td>Napitnina</td><td class="r">${money(tip)}</td></tr>
+      </table>
+      <p class="sub">Izpisano: ${new Date().toLocaleString('sl-SI', { timeZone: 'Europe/Ljubljana' })}</p>
+      </body></html>`;
+    const w = window.open('', '_blank');
+    if (!w) { toast('Brskalnik je blokiral okno za tisk.', 'error'); return; }
+    w.document.write(html); w.document.close();
   }
 
   document.addEventListener('DOMContentLoaded', init);

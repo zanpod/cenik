@@ -203,19 +203,21 @@
           <div class="sub">Vloga: ${esc(p.role === 'staff' ? 'natakar' : p.role)}</div>
         </div>
         ${canEdit ? `
-          <div class="row" style="gap:6px">
-            <input class="input staff-code" data-id="${p.id}" value="${esc(p.staff_code || '')}" placeholder="šifra" style="width:90px" />
+          <div class="row wrap" style="gap:6px">
+            <input class="input staff-code" data-id="${p.id}" value="${esc(p.staff_code || '')}" placeholder="šifra" style="width:80px" />
+            <input class="input staff-tax" data-id="${p.id}" value="${esc(p.tax_number || '')}" placeholder="davčna" style="width:100px" />
             <button class="btn btn-sm staff-code-save" data-id="${p.id}">Shrani</button>
           </div>` : `<span class="muted">Šifra: ${esc(p.staff_code || '—')}</span>`}
       </div>`).join('');
     host.querySelectorAll('.staff-code-save').forEach((b) => b.addEventListener('click', async () => {
       const id = b.dataset.id;
       const code = host.querySelector(`.staff-code[data-id="${id}"]`).value.trim() || null;
+      const tax = host.querySelector(`.staff-tax[data-id="${id}"]`).value.trim() || null;
       b.disabled = true;
-      const { error } = await sb.from('profiles').update({ staff_code: code }).eq('id', id);
+      const { error } = await sb.from('profiles').update({ staff_code: code, tax_number: tax }).eq('id', id);
       b.disabled = false;
       if (error) { console.error(error); toast('Napaka: ' + error.message, 'error', 6000); return; }
-      toast('Šifra shranjena.', 'success');
+      toast('Shranjeno.', 'success');
     }));
   }
 
