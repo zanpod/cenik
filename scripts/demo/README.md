@@ -4,6 +4,14 @@ Orodje za pošiljanje potencialnim strankam (kavarne, bari, restavracije) demo
 e-cenikov z njihovim imenom, barvami in izdelki — v nekaj minutah, brez
 ročnega klikanja po adminu.
 
+> **Če ne uporabljate terminala/Node.js:** za vsakodnevno ustvarjanje demotov
+> uporabite obrazec na **agencijaepo.si/demo** (gumb "+ Nov demo") — deluje v
+> celoti prek Supabase Edge Functions (`supabase/functions/provision-demo` in
+> `delete-demo`), ki jih namestite enkrat prek Supabase Dashboard (brez CLI,
+> brez terminala) — glej komentar na vrhu vsake od teh dveh datotek za točna
+> navodila. Preostanek tega dokumenta opisuje CLI različico (`node
+> provision.js ...`), ki je namenjena tistim, ki imajo raje ukazno vrstico.
+
 Teče **lokalno v Node.js**, s Supabase **service role** ključem iz `.env`, ki
 piše mimo RLS. Ključ nikoli ne gre v frontend kodo ali v git.
 

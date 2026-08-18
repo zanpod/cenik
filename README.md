@@ -66,9 +66,12 @@ injection), brez urejanja datoteke.
 ## Demo za potencialne stranke
 
 Za hitro pošiljanje prodajnih demo e-cenikov (z imenom, barvami in izdelki
-potencialne stranke) je na voljo Node orodje v `scripts/demo/` — glej
-[`scripts/demo/README.md`](scripts/demo/README.md). En ukaz ustvari poln demo
-lokal in izpiše povezave + QR kodo za pošiljanje.
+potencialne stranke) uporabite obrazec na **agencijaepo.si/demo** (repozitorij
+`Epo.si`) — brez terminala. Zaledje sta dve Supabase Edge Function,
+`supabase/functions/provision-demo` in `delete-demo`, ki ju enkrat namestite
+prek Supabase Dashboard (glej komentar na vrhu vsake datoteke). Za tiste, ki
+imajo raje ukazno vrstico, obstaja tudi enakovredno Node orodje v
+`scripts/demo/` — glej [`scripts/demo/README.md`](scripts/demo/README.md).
 
 ## Realni čas
 
