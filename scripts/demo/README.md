@@ -28,7 +28,8 @@ Uredite `.env`:
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` — Supabase Dashboard → Project
   Settings → API (service_role je pod "Project API keys", **ne** anon key).
 - `APP_DOMAIN` — domena, kjer je meni v živo (uporabi se v povezavah in QR
-  kodah, npr. `https://agencijaepo.si`).
+  kodah, npr. `https://demo.agencijaepo.si` — poddomena, ki dejansko streže
+  cenik sistemu; glej opombo o domeni v glavnem README.md).
 
 Nato v Supabase SQL Editorju enkrat zaženite
 `supabase/migrations/010_demo_tenants.sql` (doda stolpec `tenants.is_demo` in

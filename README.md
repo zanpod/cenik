@@ -55,6 +55,19 @@ injection), brez urejanja datoteke.
 1. Povežite repozitorij ali povlecite mapo na Netlify.
 2. Build ni potreben (`publish = "."`). `netlify.toml` / `_redirects` poskrbita
    za preusmeritev `/menu/*` na enotno stran menija.
+3. **Domena:** ta sistem je **ločen Netlify site** od agencijske strani
+   `Epo.si` (agencijaepo.si) — sta dva različna repozitorija/deploya. Da
+   povezave, ki jih generira `agencijaepo.si/demo`, dejansko delujejo,
+   dodajte temu Netlify site-u custom domeno **`demo.agencijaepo.si`**:
+   - Netlify Dashboard → ta site → **Domain settings → Add a domain** →
+     vnesite `demo.agencijaepo.si`.
+   - Netlify pokaže natančen CNAME zapis (obično proti `<vaš-site>.netlify.app`)
+     — dodajte ga pri ponudniku DNS za `agencijaepo.si`.
+   - Ko se DNS razširi (nekaj minut do ur) in Netlify izda SSL certifikat,
+     `demo.agencijaepo.si/menu/...` in `demo.agencijaepo.si/admin` delujeta.
+   - `APP_DOMAIN` v `js/supabase-config.js` se samodejno prilagodi (bere
+     `location.origin`), zato po tem koraku ni treba nič dodatno urejati v
+     kodi.
 
 ## Uporaba
 
