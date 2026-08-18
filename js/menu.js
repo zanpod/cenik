@@ -94,6 +94,11 @@
     const label = table.label || `Miza ${table.table_number}`;
     document.getElementById('table-label').textContent = label;
     document.title = `${tenant.name} — Meni`;
+
+    if (tenant.is_demo) {
+      document.getElementById('demo-banner-name').textContent = tenant.name;
+      document.getElementById('demo-banner').classList.remove('hidden');
+    }
   }
 
   // --- Category tabs --------------------------------------------------------

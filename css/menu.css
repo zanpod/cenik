@@ -24,6 +24,23 @@ body.menu-body {
   background: linear-gradient(180deg, rgba(10, 11, 20, 0.92), rgba(10, 11, 20, 0.6) 70%, transparent);
   backdrop-filter: blur(10px);
 }
+.demo-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin-bottom: 10px;
+  padding: 5px 10px;
+  border-radius: var(--radius-pill);
+  background: rgba(250, 204, 21, 0.14);
+  border: 1px solid rgba(250, 204, 21, 0.35);
+  color: #facc15;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  text-align: center;
+}
 .menu-header-top { display: flex; align-items: center; gap: 12px; }
 .tenant-logo {
   width: 44px; height: 44px;

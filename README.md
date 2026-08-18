@@ -63,6 +63,13 @@ injection), brez urejanja datoteke.
 - **Osebje:** `https://<domena>/admin` → prijava → nadzorna plošča naročil v
   realnem času (zvočno + sistemsko obvestilo ob novem naročilu).
 
+## Demo za potencialne stranke
+
+Za hitro pošiljanje prodajnih demo e-cenikov (z imenom, barvami in izdelki
+potencialne stranke) je na voljo Node orodje v `scripts/demo/` — glej
+[`scripts/demo/README.md`](scripts/demo/README.md). En ukaz ustvari poln demo
+lokal in izpiše povezave + QR kodo za pošiljanje.
+
 ## Realni čas
 
 Nadzorna plošča se naroči na Supabase Realtime za `orders` (INSERT/UPDATE) in

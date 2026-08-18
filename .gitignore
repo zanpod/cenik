@@ -7,3 +7,7 @@ node_modules/
 .netlify/
 .vscode/
 .idea/
+
+# Demo provisioning — generirani demo vhodi/QR kode (glej scripts/demo/README.md)
+scripts/demo/demos/*
+!scripts/demo/demos/.gitkeep

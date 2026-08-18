@@ -1,0 +1,34 @@
+{
+  "slug": "kavarna-vahtnca",
+  "name": "Kavarna VAHTNCA",
+  "primary_color": "#8B5A2B",
+  "secondary_color": "#4A2E1A",
+  "logo_url": "",
+  "categories": [
+    {
+      "name": "Tople pijače",
+      "icon": "☕",
+      "items": [
+        { "name": "Espresso", "price": 1.6 },
+        { "name": "Cappuccino", "price": 2.2 },
+        { "name": "Bela kava", "price": 2.4 }
+      ]
+    },
+    {
+      "name": "Hladne pijače",
+      "icon": "🥤",
+      "items": [
+        { "name": "Domača limonada", "price": 3.5 },
+        { "name": "Sok 0,25 l", "price": 2.8 }
+      ]
+    },
+    {
+      "name": "Prigrizki",
+      "icon": "🥪",
+      "items": [
+        { "name": "Toast šunka-sir", "price": 4.2 }
+      ]
+    }
+  ],
+  "tables": 6
+}
