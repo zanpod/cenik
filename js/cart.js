@@ -39,6 +39,7 @@ const Cart = (() => {
       items[id] = {
         id,
         menu_item_id: menuItem.menu_item_id || menuItem.id,
+        variant_name: menuItem.variant_name || null,
         name: menuItem.name,
         price: Number(menuItem.price),
         quantity: 1,

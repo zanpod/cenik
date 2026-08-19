@@ -201,7 +201,7 @@
     if (orderable && hasVariants) {
       card.querySelectorAll('.variant-chip').forEach((chip) => chip.addEventListener('click', () => {
         const v = item.variants[Number(chip.dataset.vi)];
-        Cart.add({ id: `${item.id}|${v.name}`, menu_item_id: item.id, name: `${item.name} – ${v.name}`, price: v.price });
+        Cart.add({ id: `${item.id}|${v.name}`, menu_item_id: item.id, variant_name: v.name, name: `${item.name} – ${v.name}`, price: v.price });
         pulse(card);
       }));
     } else if (orderable) {
@@ -321,7 +321,7 @@
 
   // --- Submit order ---------------------------------------------------------
   async function submitOrder() {
-    const { items, total } = Cart.getState();
+    const { items } = Cart.getState();
     if (!items.length) return;
     const btn = document.getElementById('submit-order');
     btn.disabled = true;
@@ -330,36 +330,23 @@
     const orderNote = document.getElementById('order-note').value.trim();
 
     try {
-      // Generate the order id client-side: anonymous customers may INSERT but
-      // not SELECT orders (per RLS), so we must not request the row back via
-      // .select() — that would require read access and fail.
-      const orderId = (crypto.randomUUID && crypto.randomUUID()) ||
-        ('xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-          const r = Math.random() * 16 | 0;
-          return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
-        }));
-
-      const { error: oe } = await sb.from('orders').insert({
-        id: orderId,
-        tenant_id: tenant.id,
-        table_id: table.id,
-        status: 'new',
-        notes: orderNote || null,
-        total: Number(total.toFixed(2)),
-      });
-      if (oe) throw oe;
-
-      const rows = items.map((it) => ({
-        order_id: orderId,
+      // Cena/ime vsake postavke se preveri in prebere na strežniku (glej
+      // submit_guest_order, migracija 012) — kar pošljemo tu, je samo
+      // izbira gosta, ne vir resnice za obračun.
+      const payloadItems = items.map((it) => ({
         menu_item_id: it.menu_item_id || it.id,
-        tenant_id: tenant.id,
-        item_name: it.name,
-        item_price: it.price,
+        variant_name: it.variant_name || null,
         quantity: it.quantity,
         notes: it.note || null,
       }));
-      const { error: ie } = await sb.from('order_items').insert(rows);
-      if (ie) throw ie;
+
+      const { error } = await sb.rpc('submit_guest_order', {
+        p_tenant_id: tenant.id,
+        p_table_id: table.id,
+        p_items: payloadItems,
+        p_notes: orderNote || null,
+      });
+      if (error) throw error;
 
       // Success
       Cart.clear();
@@ -372,7 +359,10 @@
       document.getElementById('confirm-overlay').classList.add('open');
     } catch (err) {
       console.error(err);
-      toast('Napaka pri pošiljanju naročila. Poskusite znova.', 'error');
+      // Sporočila iz submit_guest_order (RAISE EXCEPTION) so namenjena gostu
+      // (npr. "ni dovolj zaloge") — prikažemo jih neposredno, kar drugo pade
+      // nazaj na splošno besedilo.
+      toast(err?.message || 'Napaka pri pošiljanju naročila. Poskusite znova.', 'error');
     } finally {
       btn.disabled = false;
       btn.textContent = 'Pošlji naročilo';

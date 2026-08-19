@@ -93,15 +93,18 @@ naročila v živo, urejanje menija, nastavitve). Prek RLS
 enak mehanizem, ki že loči prave stranke med sabo, zato je varno dati poln
 dostop.
 
-Zaledje so tri Supabase Edge Functions:
+Zaledje so štiri Supabase Edge Functions:
 - **`provision-demo`** — ustvari/posodobi demo + admin račun. Deluje javno
   (obvezen e-mail, geslo se pošlje SAMO po e-pošti, omejeno s preprostim
   rate-limitom — glej migracijo `011_demo_signup_log.sql`) IN skrbniško
   (prijavljeni klicatelj, brez omejitve, geslo se vrne tudi na zaslon).
-- **`delete-demo`**, **`reset-demo-password`** — samo skrbniško (zahtevata
-  veljavno EPO.SI prijavo).
+- **`delete-demo`**, **`reset-demo-password`**, **`convert-demo`** — samo
+  skrbniško (zahtevajo veljavno EPO.SI prijavo). `convert-demo` postavi
+  `tenants.is_demo = false` (po želji tudi zamenja placeholder e-pošto admin
+  računa z resničnim naslovom stranke) — s tem lokal preneha biti "demo":
+  izgine s seznama na `/demo` in ga `cleanup_demo_orders()` ne čisti več.
 
-Vse tri namestite enkrat prek Supabase Dashboard (glej komentar na vrhu
+Vse štiri namestite enkrat prek Supabase Dashboard (glej komentar na vrhu
 vsake datoteke). Za pošiljanje e-pošte iz `provision-demo` nastavite še dve
 skrivnosti (Edge Functions → Secrets):
 - `RESEND_API_KEY` — API ključ iz [resend.com](https://resend.com) (lahko
@@ -109,9 +112,22 @@ skrivnosti (Edge Functions → Secrets):
 - `FROM_EMAIL` — pošiljateljev naslov, preverjen na Resend (npr.
   `demo@agencijaepo.si`).
 
-Za tiste, ki imajo raje ukazno vrstico, obstaja tudi enakovredno Node orodje
-v `scripts/demo/` (brez javnega samopostrežnega dela, brez e-pošte) — glej
+Demo naročila starejša od 24 ur se čistijo **samodejno vsako uro** prek
+`pg_cron` (migracija `013_schedule_demo_cleanup.sql`) — ni ju treba ročno
+poganjati. Za tiste, ki imajo raje ukazno vrstico, obstaja tudi enakovredno
+Node orodje v `scripts/demo/` (brez javnega samopostrežnega dela, brez
+e-pošte, brez pretvorbe v pravo stranko) — glej
 [`scripts/demo/README.md`](scripts/demo/README.md).
+
+## Varnost naročanja gostov
+
+Vsa javna (anonimna) naročila gredo prek `submit_guest_order()` — SQL
+funkcije (migracija `012_secure_guest_orders.sql`), ki sama prebere pravo
+ceno/ime/zalogo iz `menu_items` (odjemalčeva cena/ime v `js/menu.js` sta
+samo prikaz, ne vir resnice) in preveri lokal + mizo + zalogo, preden ustvari
+`orders`/`order_items`. Neposreden anonimni `INSERT` na ti dve tabeli je
+zaprt — to prepreči, da bi gost poslal naročilo s ponarejeno (npr. 0,01 €)
+ceno ali vrinil postavke v naročilo druge mize/lokala.
 
 ## Realni čas
 

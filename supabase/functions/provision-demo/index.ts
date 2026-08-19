@@ -157,7 +157,13 @@ Deno.serve(async (req) => {
 
     // 2) Rate-limit SAMO za javne (nezaupanja vredne) klicatelje.
     if (!isTrusted) {
-      const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+      // x-forwarded-for je veriga "klient, posrednik1, posrednik2, ...", ki jo
+      // vsak vmesni skok samo DOPOLNI (ne prepiše) — klient lahko svoj del
+      // ponaredi, zadnji vnos (najbližji strežniku) pa doda Supabase-ov lastni
+      // rob in ga ni mogoče ponarediti. Zato vzamemo ZADNJEGA, ne prvega.
+      const xff = req.headers.get('x-forwarded-for') || '';
+      const parts = xff.split(',').map((p) => p.trim()).filter(Boolean);
+      const ip = parts.length ? parts[parts.length - 1] : 'unknown';
       const since1h = new Date(Date.now() - 60 * 60 * 1000).toISOString();
       const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
