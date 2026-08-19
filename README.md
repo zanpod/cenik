@@ -78,22 +78,39 @@ injection), brez urejanja datoteke.
 
 ## Demo za potencialne stranke
 
-Za hitro pošiljanje prodajnih demo e-cenikov (z imenom, barvami in izdelki
-potencialne stranke) uporabite obrazec na **agencijaepo.si/demo** (repozitorij
-`Epo.si`) — brez terminala. Vsak demo ob ustvarjanju dobi tudi svoj **admin
-(owner) uporabniški račun** (`<slug>@demo.agencijaepo.si` + geslo, prikazano
-samo ob ustvarjanju), tako da lahko stranka sama razišče CEL program — ne le
-gostov meni, ampak tudi admin panel (mize/QR kode, naročila v živo, urejanje
-menija, nastavitve). Prek RLS (`current_tenant_id()`) ta račun vidi in ureja
-izključno svoj demo lokal — enak mehanizem, ki že loči prave stranke med
-sabo, zato je varno dati poln dostop. Geslo lahko kadarkoli ponastavite
-(gumb "Ponastavi geslo" na `/demo`).
+**agencijaepo.si/demo** (repozitorij `Epo.si`) je **javna** stran — brez
+prijave. Kdorkoli lahko ustvari nov demo: izpolni ime, barve, meni in **svoj
+e-poštni naslov**, sistem pa mu nanj samodejno pošlje dostop (povezavo za
+goste + admin prijavo). Prijavljeni skrbnik (na isti strani) dodatno vidi
+gumbe za brisanje/ponastavitev gesla in geslo tudi na zaslonu, ne le po
+e-pošti.
 
-Zaledje so tri Supabase Edge Functions — `supabase/functions/provision-demo`,
-`delete-demo` in `reset-demo-password` — ki jih enkrat namestite prek
-Supabase Dashboard (glej komentar na vrhu vsake datoteke). Za tiste, ki imajo
-raje ukazno vrstico, obstaja tudi enakovredno Node orodje v `scripts/demo/`
-(brez admin-računa, samo meni) — glej
+Vsak demo ob ustvarjanju dobi svoj **admin (owner) uporabniški račun**
+(`<slug>@demo.agencijaepo.si` + geslo), tako da lahko stranka sama razišče
+CEL program — ne le gostov meni, ampak tudi admin panel (mize/QR kode,
+naročila v živo, urejanje menija, nastavitve). Prek RLS
+(`current_tenant_id()`) ta račun vidi in ureja izključno svoj demo lokal —
+enak mehanizem, ki že loči prave stranke med sabo, zato je varno dati poln
+dostop.
+
+Zaledje so tri Supabase Edge Functions:
+- **`provision-demo`** — ustvari/posodobi demo + admin račun. Deluje javno
+  (obvezen e-mail, geslo se pošlje SAMO po e-pošti, omejeno s preprostim
+  rate-limitom — glej migracijo `011_demo_signup_log.sql`) IN skrbniško
+  (prijavljeni klicatelj, brez omejitve, geslo se vrne tudi na zaslon).
+- **`delete-demo`**, **`reset-demo-password`** — samo skrbniško (zahtevata
+  veljavno EPO.SI prijavo).
+
+Vse tri namestite enkrat prek Supabase Dashboard (glej komentar na vrhu
+vsake datoteke). Za pošiljanje e-pošte iz `provision-demo` nastavite še dve
+skrivnosti (Edge Functions → Secrets):
+- `RESEND_API_KEY` — API ključ iz [resend.com](https://resend.com) (lahko
+  isti, ki ga `Epo.si` že uporablja za `send-contact-email`, ali nov).
+- `FROM_EMAIL` — pošiljateljev naslov, preverjen na Resend (npr.
+  `demo@agencijaepo.si`).
+
+Za tiste, ki imajo raje ukazno vrstico, obstaja tudi enakovredno Node orodje
+v `scripts/demo/` (brez javnega samopostrežnega dela, brez e-pošte) — glej
 [`scripts/demo/README.md`](scripts/demo/README.md).
 
 ## Realni čas
