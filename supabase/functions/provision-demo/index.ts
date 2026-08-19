@@ -1,10 +1,18 @@
 // ============================================================================
 // EPO.SI — Edge Function: provision-demo
 // ----------------------------------------------------------------------------
-// Ustvari ali posodobi en demo lokal (tenant + kategorije + izdelki + mize).
-// Namenjena obrazcu na agencijaepo.si/demo, da lahko prodajni demo pripravite
-// v brskalniku, brez terminala (isto logiko kot scripts/demo/provision.js, a
-// teče na strežniku).
+// Ustvari ali posodobi en demo lokal (tenant + kategorije + izdelki + mize +
+// admin uporabnik). Namenjena obrazcu na agencijaepo.si/demo, da lahko
+// prodajni demo pripravite v brskalniku, brez terminala (isto logiko kot
+// scripts/demo/provision.js, a teče na strežniku).
+//
+// Ob PRVEM ustvarjanju vsak demo dobi tudi svoj admin (owner) uporabniški
+// račun — geslo v odgovoru (admin_password) se prikaže SAMO takrat, ker ga
+// Supabase ne hrani v berljivi obliki. Ta uporabnik prek RLS (current_tenant_id())
+// vidi in ureja IZKLJUČNO svoj demo lokal (admin panel, mize, naročila,
+// nastavitve) — enak mehanizem, ki že loči prave stranke med sabo, zato je
+// varno stranki dati poln dostop do lastnega demo admin panela. Za
+// ponastavitev gesla obstoječega demota glej reset-demo-password.
 //
 // NAMESTITEV (Supabase Dashboard, brez CLI):
 //   1. Supabase Dashboard (cenik projekt) → Edge Functions → "Deploy a new
@@ -37,6 +45,15 @@ function json(body: unknown, status = 200) {
 // za preverjanje, da je X-Epo-Auth žeton veljavna EPO.SI prijava.
 const EPO_SI_URL = Deno.env.get('EPO_SI_SUPABASE_URL') || 'https://ebcwiesqpnthzgowjsjq.supabase.co';
 const EPO_SI_ANON_KEY = Deno.env.get('EPO_SI_SUPABASE_ANON_KEY') || 'sb_publishable_BnjJvUIniOhD8hDpfqdaog_XlS02_4s';
+
+// Berljivo naključno geslo (brez zamenljivih znakov 0/O, 1/l/I) za demo admin
+// račune — prikazano stranki, zato mora biti enostavno za prepisati.
+function generatePassword(length = 12): string {
+  const charset = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  const bytes = new Uint8Array(length);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => charset[b % charset.length]).join('');
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
@@ -140,7 +157,46 @@ Deno.serve(async (req) => {
     }
     tables.sort((a: any, b: any) => a.table_number - b.table_number);
 
-    return json({ ok: true, tenant, tables, categories: categories.length, items: itemCount });
+    // Poskrbi za admin (owner) uporabnika tega demo lokala, da lahko stranka
+    // sama razišče CEL admin panel — ne le gostov meni. E-pošta je
+    // determinirana iz slug-a (za ponovno uporabo/prikaz); geslo je vrnjeno
+    // samo ob prvem ustvarjanju.
+    const { data: existingProfile, error: profSelErr } = await admin
+      .from('profiles').select('id').eq('tenant_id', tenant.id).eq('role', 'owner').maybeSingle();
+    if (profSelErr) return json({ error: `Napaka pri preverjanju admin uporabnika: ${profSelErr.message}` }, 500);
+
+    const adminEmail = `${slug}@demo.agencijaepo.si`;
+    let adminPassword: string | null = null;
+
+    if (!existingProfile) {
+      adminPassword = generatePassword();
+      const { data: createdUser, error: userErr } = await admin.auth.admin.createUser({
+        email: adminEmail,
+        password: adminPassword,
+        email_confirm: true,
+        user_metadata: { full_name: `${name} (demo)` },
+      });
+      if (userErr) return json({ error: `Napaka pri ustvarjanju admin uporabnika: ${userErr.message}` }, 500);
+
+      const { error: profErr } = await admin.from('profiles').upsert({
+        id: createdUser.user!.id,
+        tenant_id: tenant.id,
+        role: 'owner',
+        full_name: `${name} (demo)`,
+      });
+      if (profErr) return json({ error: `Napaka pri povezovanju admin uporabnika: ${profErr.message}` }, 500);
+    }
+
+    return json({
+      ok: true,
+      tenant,
+      tables,
+      categories: categories.length,
+      items: itemCount,
+      admin_email: adminEmail,
+      admin_password: adminPassword,
+      admin_is_new: !existingProfile,
+    });
   } catch (err) {
     console.error(err);
     return json({ error: String((err as any)?.message || err) }, 500);

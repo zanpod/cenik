@@ -80,11 +80,21 @@ injection), brez urejanja datoteke.
 
 Za hitro pošiljanje prodajnih demo e-cenikov (z imenom, barvami in izdelki
 potencialne stranke) uporabite obrazec na **agencijaepo.si/demo** (repozitorij
-`Epo.si`) — brez terminala. Zaledje sta dve Supabase Edge Function,
-`supabase/functions/provision-demo` in `delete-demo`, ki ju enkrat namestite
-prek Supabase Dashboard (glej komentar na vrhu vsake datoteke). Za tiste, ki
-imajo raje ukazno vrstico, obstaja tudi enakovredno Node orodje v
-`scripts/demo/` — glej [`scripts/demo/README.md`](scripts/demo/README.md).
+`Epo.si`) — brez terminala. Vsak demo ob ustvarjanju dobi tudi svoj **admin
+(owner) uporabniški račun** (`<slug>@demo.agencijaepo.si` + geslo, prikazano
+samo ob ustvarjanju), tako da lahko stranka sama razišče CEL program — ne le
+gostov meni, ampak tudi admin panel (mize/QR kode, naročila v živo, urejanje
+menija, nastavitve). Prek RLS (`current_tenant_id()`) ta račun vidi in ureja
+izključno svoj demo lokal — enak mehanizem, ki že loči prave stranke med
+sabo, zato je varno dati poln dostop. Geslo lahko kadarkoli ponastavite
+(gumb "Ponastavi geslo" na `/demo`).
+
+Zaledje so tri Supabase Edge Functions — `supabase/functions/provision-demo`,
+`delete-demo` in `reset-demo-password` — ki jih enkrat namestite prek
+Supabase Dashboard (glej komentar na vrhu vsake datoteke). Za tiste, ki imajo
+raje ukazno vrstico, obstaja tudi enakovredno Node orodje v `scripts/demo/`
+(brez admin-računa, samo meni) — glej
+[`scripts/demo/README.md`](scripts/demo/README.md).
 
 ## Realni čas
 
