@@ -1,8 +1,9 @@
 // ============================================================================
-// EPO.SI — Računi (invoices): izdaja + prikaz + tiskanje
-// Slovenska zakonodaja (ZDDV-1 obvezni elementi, ZDavPR struktura).
-// TESTNI način: računi NISO davčno potrjeni (brez FURS ZOI/EOR) in so kot taki
-// jasno označeni. Realno FURS potrjevanje se doda kasneje (tenant.fiscal_enabled).
+// EPO.SI — Invoices: issuing + display + printing
+// Slovenian legislation (ZDDV-1 mandatory elements, ZDavPR structure).
+// TEST mode: invoices are NOT fiscally verified (no FURS ZOI/EOR) and are
+// clearly marked as such. Real FURS fiscalization is enabled later via
+// tenant.fiscal_enabled.
 // ============================================================================
 
 const Invoice = (() => {
@@ -35,7 +36,7 @@ const Invoice = (() => {
     loadOrIssue(order, tableLabel);
   }
 
-  // Račun na ravni MIZE: skupni (vse postavke) ali deljeni (izbrane postavke).
+  // Table-level invoice: full (all items) or split (selected items).
   function openForTable(tableId, tableLabel) {
     ensureModal();
     document.getElementById('invoice-modal').classList.add('open');
@@ -49,7 +50,7 @@ const Invoice = (() => {
   async function loadOrIssue(order, tableLabel) {
     const body = document.getElementById('inv-body');
     body.innerHTML = '<div class="spinner"></div>';
-    // Že izdan račun za to naročilo?
+    // Has an invoice already been issued for this order?
     const { data: existing } = await sb.from('invoices').select('*')
       .eq('order_id', order.id).order('created_at').limit(1).maybeSingle();
     if (existing) { showReceipt(existing, tableLabel); return; }
@@ -89,12 +90,12 @@ const Invoice = (() => {
     });
   }
 
-  // --- Obračun mize: izbira postavk (skupni / deljeni) ----------------------
+  // --- Table billing: item selection (full / split) --------------------------
   async function loadTableBilling(tableId, tableLabel) {
     const body = document.getElementById('inv-body');
     body.innerHTML = '<div class="spinner"></div>';
 
-    // Neobračunane postavke vseh aktivnih (nepreklicanih) naročil te mize.
+    // Unbilled items from all active (non-cancelled) orders for this table.
     const { data: rawItems, error } = await sb.from('order_items')
       .select('id, item_name, item_price, quantity, order_id, orders!inner(table_id, status, created_at)')
       .is('invoice_id', null)
@@ -108,7 +109,7 @@ const Invoice = (() => {
       return;
     }
 
-    // Že izdani računi te mize (za ponovni tisk).
+    // Invoices already issued for this table (for reprinting).
     const { data: invs } = await sb.from('invoices').select('*')
       .eq('table_id', tableId).order('created_at', { ascending: false });
 
@@ -204,7 +205,7 @@ const Invoice = (() => {
         document.getElementById('bill-grand').textContent = formatPrice(grandTotal, cur);
       };
 
-      // Deljeno plačilo: ob vnosu enega zneska samodejno izračuna razliko.
+      // Split payment: entering one amount auto-computes the remainder.
       const fld = (id) => document.getElementById(id);
       const val = (id) => Math.max(0, Number(fld(id).value) || 0);
       const setVal = (id, n) => { fld(id).value = (Math.round(Math.max(0, n) * 100) / 100).toFixed(2); };
@@ -298,8 +299,8 @@ const Invoice = (() => {
     }
     const inv = Array.isArray(data) ? data[0] : data;
 
-    // Po obračunu: naročila te mize, ki so v CELOTI plačana, gredo v "postreženo"
-    // (miza/runda se zaključi). Delno plačane ostanejo odprte.
+    // After billing: orders for this table that are FULLY paid move to "served"
+    // (the table/round is closed). Partially paid orders remain open.
     const { data: tOrders } = await sb.from('orders')
       .select('id, status, order_items(invoice_id)')
       .eq('table_id', tableId).neq('status', 'cancelled');
@@ -316,7 +317,7 @@ const Invoice = (() => {
 
   async function showReceipt(inv, tableLabel) {
     const body = document.getElementById('inv-body');
-    // FURS potrjevanje samo če je vklopljeno (v testu je fiscal_enabled=false → preskok).
+    // FURS fiscalization only if enabled (in test mode fiscal_enabled=false → skipped).
     const tenant = (window.AdminShell && AdminShell.tenant) || {};
     if (tenant.fiscal_enabled && !inv.eor) {
       body.innerHTML = '<div class="spinner"></div><p class="muted text-center">Davčno potrjevanje (FURS)…</p>';
@@ -324,7 +325,7 @@ const Invoice = (() => {
     }
     let qrImg = '';
     if (inv.zoi && inv.eor) {
-      // Po možnosti uporabi QR, ki ga je vrnil strežnik (zagotovljena skladnost).
+      // Prefer the QR content returned by the server (guarantees consistency).
       const qrText = inv.qr || fursQrData(inv.zoi, String(inv.seller_tax_number || '').replace(/^SI/i, ''), inv.issued_at);
       qrImg = await qrDataUrl(qrText);
     }
@@ -341,7 +342,7 @@ const Invoice = (() => {
     if (stornoBtn) stornoBtn.addEventListener('click', () => storno(inv.id, inv.table_id, tableLabel));
   }
 
-  // Odpre obstoječ račun (npr. iz Zgodovine) — prikaz + tisk + storno.
+  // Opens an existing invoice (e.g. from History) — display + print + void.
   async function openInvoice(invoiceId, tableLabel) {
     ensureModal();
     document.getElementById('invoice-modal').classList.add('open');
@@ -352,7 +353,7 @@ const Invoice = (() => {
     showReceipt(data, tableLabel);
   }
 
-  // Pokliče Edge funkcijo za davčno potrjevanje (samo če je FURS vklopljen).
+  // Calls the Edge function for fiscal verification (only if FURS is enabled).
   async function fiscalize(inv) {
     try {
       const { data, error } = await sb.functions.invoke('furs-fiscalize', { body: { invoice_id: inv.id } });
@@ -366,8 +367,8 @@ const Invoice = (() => {
     }
   }
 
-  // QR vsebina po FURS (60 števk) — zrcali supabase/functions/_shared/furs.ts.
-  // Datum/čas v coni Europe/Ljubljana (enako kot strežnik).
+  // QR content per FURS spec (60 digits) — mirrors supabase/functions/_shared/furs.ts.
+  // Date/time in the Europe/Ljubljana zone (same as the server).
   function fursQrData(zoiHex, taxNumber, iso) {
     const dec = BigInt('0x' + zoiHex).toString().padStart(39, '0');
     const parts = new Intl.DateTimeFormat('sv-SE', {
@@ -398,7 +399,7 @@ const Invoice = (() => {
     });
   }
 
-  // --- Receipt markup (vsi obvezni elementi po ZDDV-1) ----------------------
+  // --- Receipt markup (all mandatory elements per ZDDV-1) --------------------
   function receiptHTML(inv, tableLabel, qrImg) {
     const cur = inv.currency || '€';
     const items = (inv.items || []).map((it) => `
@@ -482,7 +483,7 @@ const Invoice = (() => {
     return ({ gotovina: 'Gotovina', kartica: 'Kartica', drugo: 'Drugo' })[m] || (m || '—');
   }
 
-  // --- Print: ozek izpis za male (Bluetooth) termalne tiskalnike (58/80 mm) --
+  // --- Print: narrow layout for small (Bluetooth) thermal printers (58/80 mm) --
   function printReceipt(inv, tableLabel, qrImg) {
     const t = (window.AdminShell && AdminShell.tenant) || {};
     const width = Number(t.receipt_width) === 80 ? 80 : 58;
@@ -497,7 +498,7 @@ const Invoice = (() => {
     w.document.close();
   }
 
-  // Ozka, enobarvna, monospace postavitev (zanesljiva za termalne tiskalnike).
+  // Narrow, single-color, monospace layout (reliable on thermal printers).
   function thermalReceiptHTML(inv, tableLabel, qrImg, logo) {
     const c = inv.currency || '€';
     const price = (n) => Number(n || 0).toFixed(2).replace('.', ',');

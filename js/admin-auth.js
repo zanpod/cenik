@@ -43,7 +43,7 @@ const AdminShell = (() => {
     const shell = document.getElementById('admin-shell');
     if (!shell) return;
 
-    // Natakar (staff) vidi le naročila in novo naročilo.
+    // Staff (waiter) role only sees orders and new-order.
     const isStaff = profile?.role === 'staff';
     const items = NAV.filter((n) => !isStaff || n.staff);
 
@@ -102,7 +102,7 @@ const AdminShell = (() => {
   async function init(activeKey, title) {
     const ctx = await requireAuth();
     if (!ctx) return null;
-    // Natakar nima dostopa do drugih strani — preusmeri na naročila.
+    // Staff has no access to other pages — redirect to orders.
     if (ctx.profile.role === 'staff' && !STAFF_KEYS.includes(activeKey)) {
       location.replace('/admin/dashboard.html');
       return null;

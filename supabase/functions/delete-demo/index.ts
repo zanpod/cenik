@@ -1,17 +1,17 @@
 // ============================================================================
 // EPO.SI — Edge Function: delete-demo
 // ----------------------------------------------------------------------------
-// Izbriše en demo lokal (CASCADE: kategorije, izdelki, mize, naročila, računi)
-// IN njegov admin (owner) uporabniški račun, ustvarjen ob provision-demo.
-// Namenjena gumbu "Izbriši" na agencijaepo.si/demo. Briše SAMO lokale z
-// is_demo = true, da po nesreči ne izbrišete prave (plačljive) stranke.
+// Deletes a single demo tenant (CASCADE: categories, items, tables, orders,
+// invoices) AND its admin (owner) user account created during provision-demo.
+// Backs the "Delete" button on agencijaepo.si/demo. Deletes ONLY tenants with
+// is_demo = true, so a real (paying) customer can never be deleted by accident.
 //
-// NAMESTITEV (Supabase Dashboard, brez CLI): enako kot provision-demo — Edge
-// Functions → Deploy a new function → ime "delete-demo" → prilepite to
-// datoteko → Deploy.
+// DEPLOYMENT (Supabase Dashboard, no CLI): same as provision-demo — Edge
+// Functions → Deploy a new function → name "delete-demo" → paste this file →
+// Deploy.
 //
-// AVTORIZACIJA: glej provision-demo/index.ts — enak mehanizem (X-Epo-Auth
-// preverjen proti EPO.SI projektu).
+// AUTHORIZATION: see provision-demo/index.ts — same mechanism (X-Epo-Auth
+// verified against the EPO.SI project).
 // ============================================================================
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -53,9 +53,9 @@ Deno.serve(async (req) => {
       return json({ error: `"${tenant.name}" NI označen kot demo (is_demo=false) — brisanje zavrnjeno.` }, 403);
     }
 
-    // Zabeleži povezane admin uporabnike PRED brisanjem lokala (profiles
-    // vrstica se izbriše prek CASCADE skupaj s tenant vrstico, a auth.users
-    // vnos ostane, dokler ga ne izbrišemo eksplicitno spodaj).
+    // Record the linked admin users BEFORE deleting the tenant (the profiles
+    // row is deleted via CASCADE along with the tenant row, but the
+    // auth.users entry stays until we delete it explicitly below).
     const { data: profiles } = await admin.from('profiles').select('id').eq('tenant_id', tenant.id);
 
     const { error: delErr } = await admin.from('tenants').delete().eq('id', tenant.id);

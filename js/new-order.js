@@ -1,7 +1,8 @@
 // ============================================================================
-// EPO.SI — Ročno naročilo (natakar): izbira mize + dodajanje izdelkov.
-// Vsaka oddaja ustvari naročilo (rundo) za izbrano mizo, ki se na nadzorni
-// plošči pojavi v realnem času. Podpira "prodaj vseeno" ob manjku zaloge.
+// EPO.SI — Manual order (staff): table selection + adding items.
+// Each submission creates an order (round) for the selected table, which
+// appears on the dashboard in real time. Supports "sell anyway" when stock
+// is insufficient.
 // ============================================================================
 
 (function () {
@@ -31,7 +32,7 @@
     tables = tb.data || [];
     categories = c.data || [];
     items = i.data || [];
-    // Ohrani izbrano mizo (npr. po oddaji runde), sicer privzeto prva.
+    // Keep the selected table (e.g. after submitting a round), else default to the first.
     if (!selectedTableId || !tables.some((t) => t.id === selectedTableId)) {
       selectedTableId = tables[0]?.id || null;
     }
@@ -146,7 +147,7 @@
 
   function addItem(it) {
     const inCart = cart[it.id]?.qty || 0;
-    // "Prodaj vseeno" — če sledimo zalogi in je ni dovolj, potrdimo.
+    // "Sell anyway" — if we track stock and it's insufficient, ask for confirmation.
     if (it.track_stock && inCart + 1 > it.stock_quantity) {
       const ok = confirm(`Ni dovolj zaloge za "${it.name}" (na voljo: ${Math.max(0, it.stock_quantity)}). Prodam vseeno?`);
       if (!ok) return;
@@ -274,11 +275,11 @@
       const { error: ie } = await sb.from('order_items').insert(rows);
       if (ie) throw ie;
 
-      // Počisti in osveži zaloge (trigger jih je odpisal v bazi).
+      // Clear the cart and refresh stock (a DB trigger already deducted it).
       Object.keys(cart).forEach((k) => delete cart[k]);
       document.getElementById('no-note').value = '';
       closeSheet();
-      await load();              // ponovno preberi zaloge
+      await load();              // re-read stock levels
       renderLayout();
       refresh();
       toast('✅ Naročilo oddano.', 'success');

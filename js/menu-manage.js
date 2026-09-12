@@ -7,15 +7,16 @@
   let categories = [];
   let items = [];
   let ingredients = [];
-  let recipeRows = [];   // [{ ingredient_id, quantity }] za odprt item modal
-  let variantRows = [];  // [{ name, price }] za odprt item modal
+  let recipeRows = [];   // [{ ingredient_id, quantity }] for the open item modal
+  let variantRows = [];  // [{ name, price }] for the open item modal
   let editingCatId = null;
   let editingItemId = null;
 
-  // Sestavine se v recepturi vnašajo v OSNOVNI enoti (g / ml / kos, enako kot
-  // stock_quantity — glej migracijo 004), nabavna cena pa je shranjena na
-  // NABAVNO enoto (kg / L / kos, glej js/inventory.js). Pretvorba mora biti
-  // ista na obeh mestih, da se "nabavna cena sestavin" ujema z zalogo.
+  // Ingredients in a recipe are entered in the BASE unit (g / ml / kos, same
+  // as stock_quantity — see migration 004), while the purchase price is
+  // stored per PURCHASE unit (kg / L / kos, see js/inventory.js). The
+  // conversion must be identical in both places so "ingredient cost" matches
+  // the stock figures.
   const unitFactor = (b) => (b === 'ml' || b === 'g' ? 1000 : 1);
   const toPurchaseQty = (baseQty, b) => Number(baseQty) / unitFactor(b);
 
@@ -53,7 +54,7 @@
     render();
   }
 
-  // --- Surovine (ingredients) -----------------------------------------------
+  // --- Ingredients ------------------------------------------------------------
   function openIngredients() { renderIngredients(); openModal('ing-modal'); }
 
   function renderIngredients() {
@@ -121,7 +122,7 @@
     host.querySelectorAll('.var-del').forEach((b) => b.addEventListener('click', (e) => { variantRows.splice(+e.target.dataset.idx, 1); renderVariantRows(); }));
   }
 
-  // --- Receptura v item modalu ----------------------------------------------
+  // --- Recipe within the item modal -------------------------------------------
   function renderRecipeRows() {
     const host = document.getElementById('item-recipe-rows');
     if (!recipeRows.length) { host.innerHTML = '<p class="muted" style="font-size:.82rem;margin:0">Ni sestavin.</p>'; }
@@ -148,11 +149,12 @@
     recalcItemCost();
   }
 
-  // Priporočena cena izdelka = vsota PRODAJNE cene porabljenih surovin (ne
-  // nabavne + izmišljena marža) — vsaka surovina ima svojo prodajno ceno
-  // nastavljeno v Zalogah, ki že vključuje želeni zaslužek zanjo. Nabavna
-  // cena se prikaže samo za primerjavo (dobiček/marža izdelka). Samo predlog
-  // — "Uporabi" prepiše polje s ceno, ki ostane ročno urejljivo.
+  // Suggested item price = sum of the SALE price of the ingredients used (not
+  // purchase price + a made-up margin) — each ingredient already has its own
+  // sale price set in Inventory, which already includes the desired profit
+  // for it. The purchase cost is shown only for comparison (item
+  // profit/margin). It's just a suggestion — "Use" overwrites the field,
+  // which stays manually editable afterward.
   function recalcItemCost() {
     const costEl = document.getElementById('item-cost-value');
     const suggEl = document.getElementById('item-suggested-price');
@@ -350,7 +352,7 @@
     variantRows = Array.isArray(it?.variants) ? it.variants.map((v) => ({ name: v.name, price: Number(v.price) })) : [];
     renderVariantRows();
 
-    // Receptura: naloži obstoječe sestavine izdelka.
+    // Recipe: load the item's existing ingredients.
     recipeRows = [];
     renderRecipeRows();
     if (id) {
@@ -362,7 +364,7 @@
     openModal('item-modal');
   }
 
-  // Sinhronizira recepturo (item_ingredients) z vrsticami v modalu.
+  // Syncs the recipe (item_ingredients) with the rows in the modal.
   async function syncRecipe(itemId) {
     await sb.from('item_ingredients').delete().eq('menu_item_id', itemId);
     const rows = recipeRows

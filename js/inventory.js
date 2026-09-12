@@ -1,17 +1,17 @@
 // ============================================================================
-// EPO.SI — Zaloge: Surovine/blago + Prevzem (intake) + Popis (inventura)
-// Osnovna enota je ml / g / kos. Prevzem in popis se vnašata v L / kg / kos in
-// se samodejno pretvorita (L→ml, kg→g; kos ostane kos).
+// EPO.SI — Inventory: Ingredients/stock + Intake + Stocktake
+// The base unit is ml / g / kos (piece). Intake and stocktake quantities are
+// entered in L / kg / kos and auto-converted (L→ml, kg→g; kos stays kos).
 // ============================================================================
 
 (function () {
   let tenant = null;
   let ingredients = [];
-  let tab = 'surovine';
+  let tab = 'surovine'; // ingredients | prevzem (intake) | popis (stocktake)
   let editingId = null;
 
   const purchaseUnit = (b) => (b === 'ml' ? 'L' : b === 'g' ? 'kg' : 'kos');
-  const factor = (b) => (b === 'ml' || b === 'g' ? 1000 : 1);   // base na purchase enoto
+  const factor = (b) => (b === 'ml' || b === 'g' ? 1000 : 1);   // base unit per purchase unit
   const toBase = (purchaseQty, b) => Number(purchaseQty) * factor(b);
   const toPurchase = (baseQty, b) => Number(baseQty) / factor(b);
   const num = (n) => Number(n || 0).toLocaleString('sl-SI', { maximumFractionDigits: 3 });
@@ -60,13 +60,13 @@
   }
 
   function renderActive() {
-    if (tab === 'surovine') renderSurovine();
-    else if (tab === 'prevzem') renderPrevzem();
-    else renderPopis();
+    if (tab === 'surovine') renderIngredients();
+    else if (tab === 'prevzem') renderIntake();
+    else renderStocktake();
   }
 
-  // --- Surovine / blago -------------------------------------------------------
-  function renderSurovine() {
+  // --- Ingredients / stock -----------------------------------------------------
+  function renderIngredients() {
     const host = document.getElementById('inv-body');
     if (!ingredients.length) { host.innerHTML = '<div class="empty-state"><div class="emoji">📦</div><p>Dodajte surovino ali blago.</p></div>'; return; }
     let nabSkup = 0, prodSkup = 0;
@@ -101,8 +101,8 @@
     host.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', () => del(b.dataset.del)));
   }
 
-  // --- Prevzem (intake) -------------------------------------------------------
-  function renderPrevzem() {
+  // --- Intake (prevzem) --------------------------------------------------------
+  function renderIntake() {
     const host = document.getElementById('inv-body');
     if (!ingredients.length) { host.innerHTML = '<div class="empty-state"><div class="emoji">📥</div><p>Najprej dodajte surovine.</p></div>'; return; }
     host.innerHTML = `
@@ -122,10 +122,10 @@
         </table>
       </div>
       <button class="btn btn-primary" id="prevzem-save" style="margin-top:14px">Shrani prevzem</button>`;
-    document.getElementById('prevzem-save').addEventListener('click', savePrevzem);
+    document.getElementById('prevzem-save').addEventListener('click', saveIntake);
   }
 
-  async function savePrevzem() {
+  async function saveIntake() {
     const rows = Array.from(document.querySelectorAll('#inv-body tbody tr'));
     const ops = [];
     rows.forEach((row) => {
@@ -158,8 +158,8 @@
     }
   }
 
-  // --- Popis (inventura) ------------------------------------------------------
-  function renderPopis() {
+  // --- Stocktake (popis / inventura) -------------------------------------------
+  function renderStocktake() {
     const host = document.getElementById('inv-body');
     if (!ingredients.length) { host.innerHTML = '<div class="empty-state"><div class="emoji">📋</div><p>Najprej dodajte surovine.</p></div>'; return; }
     host.innerHTML = `
@@ -183,12 +183,12 @@
         <button class="btn" id="popis-pdf">🖨 Izpiši PDF (viški/manki)</button>
         <button class="btn btn-primary" id="popis-sync">Uskladi zaloge</button>
       </div>`;
-    document.querySelectorAll('.popis-qty').forEach((inp) => inp.addEventListener('input', () => recalcPopis(inp.closest('tr'))));
-    document.getElementById('popis-pdf').addEventListener('click', popisPdf);
-    document.getElementById('popis-sync').addEventListener('click', popisSync);
+    document.querySelectorAll('.popis-qty').forEach((inp) => inp.addEventListener('input', () => recalcStocktake(inp.closest('tr'))));
+    document.getElementById('popis-pdf').addEventListener('click', stocktakePdf);
+    document.getElementById('popis-sync').addEventListener('click', syncStocktake);
   }
 
-  function recalcPopis(row) {
+  function recalcStocktake(row) {
     const unit = row.dataset.unit;
     const book = Number(row.dataset.book);
     const v = row.querySelector('.popis-qty').value;
@@ -203,7 +203,7 @@
     row.querySelector('.diffval').textContent = formatPrice(nab, cur());
   }
 
-  function collectPopis() {
+  function collectStocktake() {
     const out = [];
     document.querySelectorAll('#inv-body tbody tr').forEach((row) => {
       const v = row.querySelector('.popis-qty').value;
@@ -221,8 +221,8 @@
     return out;
   }
 
-  async function popisSync() {
-    const rows = collectPopis().filter((r) => Math.abs(r.diff) > 1e-9);
+  async function syncStocktake() {
+    const rows = collectStocktake().filter((r) => Math.abs(r.diff) > 1e-9);
     if (!rows.length) { toast('Ni razlik za uskladitev.', 'error'); return; }
     if (!confirm(`Uskladim zalogo za ${rows.length} postavk? Zaloga se nastavi na popisano stanje.`)) return;
     const btn = document.getElementById('popis-sync');
@@ -241,8 +241,8 @@
     }
   }
 
-  function popisPdf() {
-    const rows = collectPopis();
+  function stocktakePdf() {
+    const rows = collectStocktake();
     if (!rows.length) { toast('Vnesite popisano stanje.', 'error'); return; }
     let nabManko = 0, nabVisek = 0, prodManko = 0, prodVisek = 0;
     const trs = rows.map((r) => {
@@ -292,7 +292,7 @@
     w.document.write(html); w.document.close();
   }
 
-  // --- Modal: dodaj/uredi -----------------------------------------------------
+  // --- Modal: add/edit ----------------------------------------------------------
   function syncUnitLabels() {
     const pu = purchaseUnit(document.getElementById('ing-unit').value);
     document.querySelectorAll('.ing-punit').forEach((el) => { el.textContent = pu; });
@@ -315,12 +315,13 @@
     document.getElementById('ing-modal').classList.add('open');
   }
 
-  // Predlagana prodajna cena po standardni gostinski formuli "delež stroška":
-  // cena = nabavna cena / delež stroška. 30 % je splošno pravilo; pijače, kjer
-  // je marža po navadi višja, gredo pogosto na 15-20 %. Dokler prodajna cena
-  // ni bila ročno nastavljena (je še 0), jo predlog samodejno izpolni — sicer
-  // bi ostala 0, če bi kdo pozabil klikniti "Uporabi". "Uporabi" ostane za
-  // primer, ko je uporabnik prodajno ceno že spremenil, pa si premisli.
+  // Suggested sale price using the standard hospitality "cost ratio" formula:
+  // price = purchase price / cost ratio. 30% is the general rule of thumb;
+  // drinks, where margins are usually higher, often use 15-20%. As long as
+  // the sale price hasn't been manually set yet (still 0), the suggestion
+  // auto-fills it — otherwise it would stay 0 if someone forgot to click
+  // "Use". The "Use" button remains for when the user already changed the
+  // sale price and wants to revert to the suggestion.
   function recalcSuggestedSale() {
     const purchase = Number(document.getElementById('ing-purchase').value) || 0;
     const ratio = Math.min(95, Math.max(1, Number(document.getElementById('ing-cost-ratio').value) || 30));

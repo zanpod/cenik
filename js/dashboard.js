@@ -30,7 +30,7 @@
     await loadOrders();
     subscribeRealtime();
     requestNotifyPermission();
-    // Po izdaji računa (postavke dobijo invoice_id — realtime tega ne sproži).
+    // After an invoice is issued (items get invoice_id — realtime doesn't trigger for this).
     window.addEventListener('epo:invoiced', loadOrders);
 
     // Refresh "time ago" labels every 30s.
@@ -85,7 +85,7 @@
     (mi || []).forEach((m) => { stationById[m.id] = m.prep_station || 'sank'; });
   }
 
-  // --- Bon za kuhinjo/šank --------------------------------------------------
+  // --- Kitchen/bar ticket ----------------------------------------------------
   function printBon(o) {
     const table = tablesById[o.table_id];
     const label = table ? (table.label || `Miza ${table.table_number}`) : 'Miza';
@@ -141,8 +141,8 @@
     return orders.filter((o) => o.status === activeFilter);
   }
 
-  // Postavka je plačana, ko ima invoice_id; naročilo je "odprto", dokler ima
-  // vsaj eno neplačano postavko (ne glede na status).
+  // An item is paid once it has an invoice_id; an order stays "open" as long as
+  // it has at least one unpaid item (regardless of status).
   function unbilledItems(o) { return (o.items || []).filter((it) => !it.invoice_id); }
   function isOpen(o) { return o.status !== 'cancelled' && unbilledItems(o).length > 0; }
 
@@ -199,7 +199,7 @@
       const t = tablesById[tid];
       const label = t ? (t.label || `Miza ${t.table_number}`) : 'Miza ?';
       const tnum = t ? t.table_number : '?';
-      // Za plačilo = vsota neplačanih postavk.
+      // Amount due = sum of unpaid items.
       const remaining = list.reduce((s, o) =>
         s + unbilledItems(o).reduce((x, it) => x + Number(it.item_price) * it.quantity, 0), 0);
 

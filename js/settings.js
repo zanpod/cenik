@@ -116,8 +116,8 @@
     const btn = document.getElementById('s-register-premise');
     btn.disabled = true; btn.textContent = 'Registriram…';
     try {
-      // Za TEST: premična naprava (C). Za fiksni prostor uporabite real_estate
-      // podatke (kataster) — glej supabase/functions/README.md.
+      // For TEST: movable device (C). For a fixed premise use real_estate
+      // data (cadastral info) — see supabase/functions/README.md.
       const { data, error } = await sb.functions.invoke('furs-register-premise', { body: { movable_type: 'C' } });
       if (error) throw error;
       if (data && data.error) throw new Error(data.message || data.error);

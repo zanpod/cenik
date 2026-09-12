@@ -1,22 +1,23 @@
 // ============================================================================
-// EPO.SI — Edge Function: furs-register-premise (OGRODJE, privzeto ONEMOGOČENO)
+// EPO.SI — Edge Function: furs-register-premise (SCAFFOLD, DISABLED by default)
 // ----------------------------------------------------------------------------
-// Enkratna registracija poslovnega prostora pri FURS (pred izdajo davčno
-// potrjenih računov). Pošlje BusinessPremiseRequest za dani poslovni prostor.
+// One-time registration of a business premise with FURS (required before
+// issuing fiscally verified invoices). Sends a BusinessPremiseRequest for the
+// given premise.
 //
-// Kot pri furs-fiscalize: dokler FURS_ENABLED !== 'true' ali manjkajo ključi,
-// ne pošilja ničesar in vrne 501.
+// As with furs-fiscalize: as long as FURS_ENABLED !== 'true' or keys are
+// missing, it sends nothing and returns 501.
 //
-// Telo zahteve (primer):
+// Request body (example):
 //   {
 //     "real_estate": {
 //       "cadastral_number": 365, "building_number": 12, "building_section_number": 3,
-//       "street": "Ulica", "house_number": "1", "house_number_additional": "",
+//       "street": "Street", "house_number": "1", "house_number_additional": "",
 //       "community": "Ljubljana", "city": "Ljubljana", "postal_code": "1000"
 //     },
 //     "validity_date": "2026-01-01"
 //   }
-// ALI za premično napravo (npr. stojnica): { "movable_type": "C" }  (A/B/C)
+// OR for a movable device (e.g. a stand): { "movable_type": "C" }  (A/B/C)
 // ============================================================================
 
 import {
@@ -52,7 +53,7 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json();
 
-    // Avtorizacija + tenant (za davčno št. in oznako prostora/naprave).
+    // Authorization + tenant (for the tax number and premise/device label).
     const userClient = createClient(
       Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!,
       { global: { headers: { Authorization: req.headers.get('Authorization') || '' } } },
@@ -71,7 +72,7 @@ Deno.serve(async (req) => {
     const taxNumber = String(tenant.tax_number || '').replace(/^SI/i, '');
     const now = fursDateTime(new Date().toISOString());
 
-    // BPIdentifier: nepremičnina ali premična naprava — PREVERITE v FURS spec.
+    // BPIdentifier: real estate or movable device — VERIFY against the FURS spec.
     let bpIdentifier: any;
     if (body.movable_type) {
       bpIdentifier = { PremiseType: body.movable_type }; // A/B/C

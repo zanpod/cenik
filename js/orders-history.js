@@ -174,7 +174,7 @@
     URL.revokeObjectURL(a.href);
   }
 
-  // --- Z-poročilo: dnevni zaključek prometa iz izdanih računov --------------
+  // --- Z-report: daily revenue closing from issued invoices ------------------
   async function zReport() {
     const day = document.getElementById('f-from').value || new Date().toISOString().slice(0, 10);
     const from = new Date(day + 'T00:00:00').toISOString();

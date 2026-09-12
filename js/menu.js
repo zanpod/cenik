@@ -330,9 +330,9 @@
     const orderNote = document.getElementById('order-note').value.trim();
 
     try {
-      // Cena/ime vsake postavke se preveri in prebere na strežniku (glej
-      // submit_guest_order, migracija 012) — kar pošljemo tu, je samo
-      // izbira gosta, ne vir resnice za obračun.
+      // The price/name of each item is validated and read server-side (see
+      // submit_guest_order, migration 012) — what we send here is just the
+      // guest's selection, not the source of truth for billing.
       const payloadItems = items.map((it) => ({
         menu_item_id: it.menu_item_id || it.id,
         variant_name: it.variant_name || null,
@@ -359,9 +359,9 @@
       document.getElementById('confirm-overlay').classList.add('open');
     } catch (err) {
       console.error(err);
-      // Sporočila iz submit_guest_order (RAISE EXCEPTION) so namenjena gostu
-      // (npr. "ni dovolj zaloge") — prikažemo jih neposredno, kar drugo pade
-      // nazaj na splošno besedilo.
+      // Messages from submit_guest_order (RAISE EXCEPTION) are meant for the
+      // guest (e.g. "not enough stock") — we show them directly; anything
+      // else falls back to a generic message.
       toast(err?.message || 'Napaka pri pošiljanju naročila. Poskusite znova.', 'error');
     } finally {
       btn.disabled = false;

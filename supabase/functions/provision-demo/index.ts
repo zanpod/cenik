@@ -1,37 +1,40 @@
 // ============================================================================
 // EPO.SI — Edge Function: provision-demo
 // ----------------------------------------------------------------------------
-// Ustvari ali posodobi en demo lokal (tenant + kategorije + izdelki + mize +
-// admin uporabnik). Deluje v DVEH načinih:
+// Creates or updates a single demo tenant (tenant + categories + items +
+// tables + admin user). Operates in TWO modes:
 //
-//   JAVNI (samopostrežni) način — brez X-Epo-Auth glave, kdorkoli na javni
-//   agencijaepo.si/demo strani. OBVEZEN je "email" v telesu zahteve: geslo se
-//   NIKOLI ne vrne v odgovoru, ampak SAMO pošlje po e-pošti (Resend) na ta
-//   naslov — to je edini način, da ga prejemnik dobi. Omejeno s preprostim
-//   rate-limitom (glej demo_signup_log, migracija 011) proti zlorabi.
+//   PUBLIC (self-service) mode — no X-Epo-Auth header, anyone on the public
+//   agencijaepo.si/demo page. "email" in the request body is REQUIRED: the
+//   password is NEVER returned in the response, it is ONLY sent by email
+//   (Resend) to that address — that's the only way the recipient gets it.
+//   Rate-limited with a simple limiter (see demo_signup_log, migration 011)
+//   against abuse.
 //
-//   ZAUPANJA VREDEN (skrbniški) način — z veljavno X-Epo-Auth glavo (EPO.SI
-//   prijava). Brez rate-limita; "email" je neobvezen (če je podan, se pošlje
-//   ISTO obvestilo, poleg tega se geslo tudi vrne v odgovoru za takojšen
-//   prikaz na zaslonu — glej agencijaepo.si/demo, prijavljeni pogled).
+//   TRUSTED (admin) mode — with a valid X-Epo-Auth header (an EPO.SI login).
+//   No rate limit; "email" is optional (if provided, the SAME notification is
+//   sent, and additionally the password is returned in the response for
+//   immediate on-screen display — see agencijaepo.si/demo, logged-in view).
 //
-// Ob PRVEM ustvarjanju vsak demo dobi svoj admin (owner) uporabniški račun.
-// Prek RLS (current_tenant_id()) ta uporabnik vidi in ureja IZKLJUČNO svoj
-// demo lokal (admin panel, mize, naročila, nastavitve) — enak mehanizem, ki
-// že loči prave stranke med sabo, zato je varno dati poln dostop. Za
-// ponastavitev gesla obstoječega demota (skrbniško) glej reset-demo-password.
+// On FIRST creation, each demo gets its own admin (owner) user account.
+// Via RLS (current_tenant_id()) that user sees and edits EXCLUSIVELY their
+// own demo tenant (admin panel, tables, orders, settings) — the same
+// mechanism that already isolates real customers from each other, so it's
+// safe to grant full access. To reset an existing demo's password
+// (as an admin), see reset-demo-password.
 //
-// NAMESTITEV (Supabase Dashboard, brez CLI):
-//   1. Supabase Dashboard (cenik projekt) → Edge Functions → "Deploy a new
-//      function" (ali "Create a new function").
-//   2. Ime funkcije: točno "provision-demo".
-//   3. Prilepite CELOTNO vsebino te datoteke in kliknite "Deploy".
-//   4. Secrets (Edge Functions → Secrets) — za pošiljanje e-pošte:
-//        RESEND_API_KEY  — API ključ iz resend.com (lahko isti kot v epo.si
-//                          projektu, ali nov — ni pomembno, kar koli deluje).
-//        FROM_EMAIL      — pošiljateljev naslov, preverjen na Resend
-//                          (npr. demo@agencijaepo.si).
-//      SUPABASE_URL in SUPABASE_SERVICE_ROLE_KEY Supabase priskrbi sam.
+// DEPLOYMENT (Supabase Dashboard, no CLI):
+//   1. Supabase Dashboard (cenik project) → Edge Functions → "Deploy a new
+//      function" (or "Create a new function").
+//   2. Function name: exactly "provision-demo".
+//   3. Paste the ENTIRE contents of this file and click "Deploy".
+//   4. Secrets (Edge Functions → Secrets) — for sending email:
+//        RESEND_API_KEY  — API key from resend.com (can be the same as in the
+//                          epo.si project, or a new one — doesn't matter,
+//                          anything that works).
+//        FROM_EMAIL      — sender address verified on Resend
+//                          (e.g. demo@agencijaepo.si).
+//      SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are provided by Supabase itself.
 // ============================================================================
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -45,9 +48,9 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
 }
 
-// Javni (anon) podatki EPO.SI portfolio projekta — isti, ki jih ta stran že
-// razkriva v svoji client-side kodi (js/supabase-config.js). Uporabljeni SAMO
-// za preverjanje, da je X-Epo-Auth žeton veljavna EPO.SI prijava.
+// Public (anon) credentials of the EPO.SI portfolio project — the same ones
+// that site already exposes in its client-side code (js/supabase-config.js).
+// Used ONLY to verify that the X-Epo-Auth token is a valid EPO.SI login.
 const EPO_SI_URL = Deno.env.get('EPO_SI_SUPABASE_URL') || 'https://ebcwiesqpnthzgowjsjq.supabase.co';
 const EPO_SI_ANON_KEY = Deno.env.get('EPO_SI_SUPABASE_ANON_KEY') || 'sb_publishable_BnjJvUIniOhD8hDpfqdaog_XlS02_4s';
 const APP_DOMAIN = Deno.env.get('DEMO_APP_DOMAIN') || 'https://demo.agencijaepo.si';
@@ -122,9 +125,10 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
   try {
-    // 1) Poskusi avtorizirati proti EPO.SI projektu — NEOBVEZNO. Manjkajoč ali
-    // neveljaven žeton ne zavrne zahteve, samo pomeni "javni klicatelj"
-    // (strožja pravila spodaj: obvezen email, rate-limit, geslo se ne vrne).
+    // 1) Try to authorize against the EPO.SI project — OPTIONAL. A missing or
+    // invalid token does not reject the request, it just means "public
+    // caller" (stricter rules below: email required, rate-limited, password
+    // not returned).
     const epoJwt = req.headers.get('X-Epo-Auth') || '';
     let isTrusted = false;
     if (epoJwt) {
@@ -155,12 +159,13 @@ Deno.serve(async (req) => {
 
     const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
-    // 2) Rate-limit SAMO za javne (nezaupanja vredne) klicatelje.
+    // 2) Rate-limit ONLY public (untrusted) callers.
     if (!isTrusted) {
-      // x-forwarded-for je veriga "klient, posrednik1, posrednik2, ...", ki jo
-      // vsak vmesni skok samo DOPOLNI (ne prepiše) — klient lahko svoj del
-      // ponaredi, zadnji vnos (najbližji strežniku) pa doda Supabase-ov lastni
-      // rob in ga ni mogoče ponarediti. Zato vzamemo ZADNJEGA, ne prvega.
+      // x-forwarded-for is a chain "client, proxy1, proxy2, ...", where each
+      // hop only APPENDS to it (never overwrites) — the client can forge
+      // their own segment, but the last entry (closest to the server) is
+      // added by Supabase's own edge and cannot be forged. So we take the
+      // LAST entry, not the first.
       const xff = req.headers.get('x-forwarded-for') || '';
       const parts = xff.split(',').map((p) => p.trim()).filter(Boolean);
       const ip = parts.length ? parts[parts.length - 1] : 'unknown';
@@ -185,7 +190,7 @@ Deno.serve(async (req) => {
       if (logErr) return json({ error: `Napaka pri beleženju: ${logErr.message}` }, 500);
     }
 
-    // Varovalka: obstoječ slug, ki NI demo, se ne prepiše (verjetno prava stranka).
+    // Safeguard: an existing slug that is NOT a demo is never overwritten (likely a real customer).
     const { data: existing, error: exErr } = await admin.from('tenants').select('id, is_demo').eq('slug', slug).maybeSingle();
     if (exErr) return json({ error: `Napaka pri preverjanju obstoječega lokala: ${exErr.message}` }, 500);
     if (existing && !existing.is_demo) {
@@ -207,7 +212,7 @@ Deno.serve(async (req) => {
     ).select().single();
     if (tErr) return json({ error: `Napaka pri ustvarjanju lokala: ${tErr.message}` }, 500);
 
-    // Zamenjaj celoten katalog (varno za ponovni zagon — glej provision.js za razlago).
+    // Replace the whole catalog (safe to re-run — see provision.js for the rationale).
     const { error: delItemsErr } = await admin.from('menu_items').delete().eq('tenant_id', tenant.id);
     if (delItemsErr) return json({ error: `Napaka pri brisanju obstoječih izdelkov: ${delItemsErr.message}` }, 500);
     const { error: delCatErr } = await admin.from('categories').delete().eq('tenant_id', tenant.id);
@@ -241,8 +246,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Poskrbi, da obstaja vsaj tableCount miz. Obstoječih (in njihovih QR
-    // žetonov) ne brišemo — poslane QR kode morajo ostati veljavne.
+    // Ensure at least tableCount tables exist. Existing ones (and their QR
+    // tokens) are never deleted — already-distributed QR codes must stay valid.
     const { data: existingTables, error: exTErr } = await admin.from('tables').select('*').eq('tenant_id', tenant.id).order('table_number');
     if (exTErr) return json({ error: `Napaka pri branju miz: ${exTErr.message}` }, 500);
     let tables = existingTables || [];
@@ -260,11 +265,12 @@ Deno.serve(async (req) => {
     }
     tables.sort((a: any, b: any) => a.table_number - b.table_number);
 
-    // Poskrbi za admin (owner) uporabnika tega demo lokala, da lahko stranka
-    // sama razišče CEL admin panel — ne le gostov meni. E-pošta je
-    // determinirana iz slug-a. Javni klicatelji dobijo NOVO geslo ob vsakem
-    // klicu (edini način, da ga (znova) dobijo — glej pošiljanje spodaj);
-    // zaupanja vredni klicatelji dobijo novo geslo samo, če računa še ni.
+    // Ensure this demo tenant has an admin (owner) user, so the customer can
+    // explore the WHOLE admin panel themselves — not just the guest menu.
+    // The email is derived from the slug. Public callers get a NEW password
+    // on every call (the only way to (re)obtain it — see the sending logic
+    // below); trusted callers only get a new password if the account doesn't
+    // exist yet.
     const { data: existingProfile, error: profSelErr } = await admin
       .from('profiles').select('id').eq('tenant_id', tenant.id).eq('role', 'owner').maybeSingle();
     if (profSelErr) return json({ error: `Napaka pri preverjanju admin uporabnika: ${profSelErr.message}` }, 500);
@@ -297,8 +303,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Pošlji e-pošto: OBVEZNO za javne klicatelje (edini način dostave gesla),
-    // neobvezno za zaupanja vredne (samo če so email podali).
+    // Send the email: REQUIRED for public callers (the only way to deliver
+    // the password), optional for trusted ones (only if they provided an email).
     let emailed = false;
     const shouldEmail = adminPassword && (!isTrusted || email);
     if (shouldEmail) {
@@ -310,11 +316,11 @@ Deno.serve(async (req) => {
         emailed = true;
       } catch (mailErr: any) {
         if (!isTrusted) {
-          // Javnemu klicatelju brez e-pošte ne moremo povedati gesla na noben
-          // drug način — to JE napaka, ki jo mora videti.
+          // For a public caller without email, there's no other way to
+          // convey the password — this IS an error they need to see.
           return json({ error: mailErr.message || String(mailErr) }, 502);
         }
-        console.error('Pošiljanje e-pošte ni uspelo (skrbniški klic, nadaljujem):', mailErr);
+        console.error('Sending the email failed (trusted call, continuing):', mailErr);
       }
     }
 

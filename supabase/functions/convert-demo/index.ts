@@ -1,23 +1,25 @@
 // ============================================================================
 // EPO.SI — Edge Function: convert-demo
 // ----------------------------------------------------------------------------
-// Pretvori demo lokal v pravo (plačljivo) stranko: postavi tenants.is_demo na
-// false in po želji zamenja placeholder e-pošto admin računa
-// (<slug>@demo.agencijaepo.si) z resničnim naslovom stranke. Geslo ostane
-// nespremenjeno (stranka ga že pozna iz demo obdobja).
+// Converts a demo tenant into a real (paying) customer: sets tenants.is_demo
+// to false and optionally replaces the placeholder admin account email
+// (<slug>@demo.agencijaepo.si) with the customer's real address. The
+// password stays unchanged (the customer already knows it from the demo
+// period).
 //
-// Po pretvorbi lokal izgine s seznama na agencijaepo.si/demo (ni več
-// is_demo) in ga cleanup_demo_orders() ne čisti več — oboje je namerno: zdaj
-// je to prava stranka, upravlja se prek cenik admin panela, ne več prek demo
-// orodij. delete-demo/reset-demo-password po tej točki nalašč zavrneta
-// delovanje na njem (preverjata is_demo = true) — varovalka, da demo orodja
-// ne morejo po nesreči izbrisati/ponastaviti prave stranke.
+// After conversion, the tenant disappears from the list on
+// agencijaepo.si/demo (no longer is_demo) and cleanup_demo_orders() no
+// longer cleans it up — both intentional: it's now a real customer, managed
+// through the cenik admin panel, no longer through demo tooling.
+// delete-demo/reset-demo-password deliberately refuse to act on it from this
+// point on (they check is_demo = true) — a safeguard so the demo tools can
+// never accidentally delete/reset a real customer.
 //
-// NAMESTITEV (Supabase Dashboard, brez CLI): enako kot ostale — Edge
-// Functions → Deploy a new function → ime "convert-demo" → prilepite to
-// datoteko → Deploy.
+// DEPLOYMENT (Supabase Dashboard, no CLI): same as the others — Edge
+// Functions → Deploy a new function → name "convert-demo" → paste this file →
+// Deploy.
 //
-// AVTORIZACIJA: samo skrbniško (X-Epo-Auth, enak mehanizem kot delete-demo).
+// AUTHORIZATION: admin-only (X-Epo-Auth, same mechanism as delete-demo).
 // ============================================================================
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';

@@ -1,20 +1,21 @@
 // ============================================================================
-// EPO.SI — FURS fiskalna verifikacija: skupne pomožne funkcije
+// EPO.SI — FURS fiscal verification: shared helper functions
 // ----------------------------------------------------------------------------
-// Implementira ZOI, JWS (RS256) in QR po tehnični specifikaciji FURS
-// (Protokol za izmenjavo podatkov — Davčno potrjevanje računov):
+// Implements ZOI, JWS (RS256) and QR per the FURS technical specification
+// (Data exchange protocol — Fiscal verification of invoices):
 //   https://edavki.durs.si/.../PageD.aspx?category=dpr_teh_spec
 //
-// Uporablja node:crypto (podprto v Supabase Edge runtime / Deno).
-// Opomba: format DN v glavi JWS (subject_name/issuer_name) ter morebitna
-// odstopanja je treba potrditi proti FURS TEST okolju (vrača opisne napake).
+// Uses node:crypto (supported in the Supabase Edge runtime / Deno).
+// Note: the DN format in the JWS header (subject_name/issuer_name) and any
+// discrepancies need to be verified against the FURS TEST environment
+// (it returns descriptive errors).
 // ============================================================================
 
 import { createSign, createHash, X509Certificate } from 'node:crypto';
 
 export type FursEnv = 'test' | 'prod';
 
-// Uradni FURS končni točki.
+// Official FURS endpoints.
 export function fursBaseUrl(env: FursEnv): string {
   return env === 'prod'
     ? 'https://blagajne.fu.gov.si:9003/v1/cash_registers'
@@ -31,8 +32,8 @@ function b64urlDecode(s: string): Buffer {
   return Buffer.from(s.replace(/-/g, '+').replace(/_/g, '/') + pad, 'base64');
 }
 
-// --- Datum/čas v formatu FURS "yyyy-MM-ddTHH:mm:ss" v coni Europe/Ljubljana --
-// Pomembno: isti niz se uporabi v ZOI, v sporočilu (IssueDateTime) in na QR.
+// --- Date/time in the FURS format "yyyy-MM-ddTHH:mm:ss" in the Europe/Ljubljana zone --
+// Important: the same string is used in the ZOI, in the message (IssueDateTime) and on the QR.
 export function fursDateTime(iso: string): string {
   const d = new Date(iso);
   const parts = new Intl.DateTimeFormat('sv-SE', {
@@ -46,10 +47,10 @@ export function fursDateTime(iso: string): string {
 }
 
 // ============================================================================
-// ZOI — Zaščitna oznaka izdajatelja
-// Konkatenacija: davčna št. + datum/čas izdaje + zap. št. računa + oznaka
-// poslovnega prostora + oznaka el. naprave + znesek. Podpis RSA-SHA256, nato
-// MD5 → 32-mestni hex (male črke).
+// ZOI — Zaščitna oznaka izdajatelja (Issuer's protection mark)
+// Concatenation: tax number + issue date/time + invoice sequence number +
+// business premise ID + electronic device ID + amount. Signed with
+// RSA-SHA256, then MD5 → 32-char hex (lowercase).
 // ============================================================================
 export interface ZoiParams {
   taxNumber: string;
@@ -57,7 +58,7 @@ export interface ZoiParams {
   invoiceNumber: string | number;
   businessPremiseId: string;
   electronicDeviceId: string;
-  invoiceAmount: string;       // npr. "24.31"
+  invoiceAmount: string;       // e.g. "24.31"
 }
 
 export function computeZOI(p: ZoiParams, privateKeyPem: string): string {
@@ -72,8 +73,8 @@ export function computeZOI(p: ZoiParams, privateKeyPem: string): string {
 }
 
 // ============================================================================
-// QR koda (60 števk): 39 (ZOI hex→dec) + 8 (davčna) + 12 (YYMMDDHHmmss) + 1 (mod 10)
-// Datum se vzame iz ISTEGA FURS niza, da je zagotovljena skladnost.
+// QR code (60 digits): 39 (ZOI hex→dec) + 8 (tax number) + 12 (YYMMDDHHmmss) + 1 (mod 10)
+// The date is taken from the SAME FURS string to guarantee consistency.
 // ============================================================================
 export function buildQrData(zoiHex: string, taxNumber: string, fursDateTimeStr: string): string {
   const dec = BigInt('0x' + zoiHex).toString().padStart(39, '0');
@@ -85,15 +86,15 @@ export function buildQrData(zoiHex: string, taxNumber: string, fursDateTimeStr: 
   return base + control;
 }
 
-// --- Format DN (subject/issuer) za glavo JWS --------------------------------
-// node vrne npr. "C=SI\nO=...\nCN=...". FURS pričakuje en niz; uporabimo
-// RFC4514 vrstni red (od najbolj specifičnega), ločeno z ", ".
+// --- Format the DN (subject/issuer) for the JWS header ----------------------
+// node returns e.g. "C=SI\nO=...\nCN=...". FURS expects a single string; we
+// use RFC4514 order (most specific first), separated by ", ".
 function formatDN(dn: string): string {
   return dn.split('\n').map((s) => s.trim()).filter(Boolean).reverse().join(', ');
 }
 
 // ============================================================================
-// JWS (kompaktni zapis) — RS256, glava z metapodatki certifikata.
+// JWS (compact serialization) — RS256, header carries certificate metadata.
 // ============================================================================
 export function buildJWS(payload: unknown, privateKeyPem: string, certPem: string): string {
   const cert = new X509Certificate(certPem);
@@ -113,7 +114,7 @@ export function buildJWS(payload: unknown, privateKeyPem: string, certPem: strin
   return `${signingInput}.${b64url(signer.sign(privateKeyPem))}`;
 }
 
-// Razčleni JWS odgovor FURS in vrne payload kot objekt.
+// Parses a FURS JWS response and returns the payload as an object.
 export function parseJWS(token: string): any {
   const parts = token.split('.');
   if (parts.length < 2) throw new Error('Neveljaven JWS odgovor.');
@@ -124,9 +125,10 @@ export function uuid(): string {
   return crypto.randomUUID();
 }
 
-// Pošlje podpisano sporočilo na FURS. Če je nastavljen FURS_CA_PEM, uporabi
-// lastno verigo zaupanja (FURS strežnik uporablja sigov-ca / SI-TRUST).
-// Vrne status, razčlenjen payload (iz JWS) in surov odgovor za diagnostiko.
+// Sends the signed message to FURS. If FURS_CA_PEM is set, uses a custom
+// trust chain (the FURS server uses sigov-ca / SI-TRUST).
+// Returns the status, the parsed payload (from the JWS), and the raw
+// response for diagnostics.
 export async function fursPost(
   url: string, payload: unknown, privateKeyPem: string, certPem: string,
 ): Promise<{ status: number; payload: any; raw: any }> {

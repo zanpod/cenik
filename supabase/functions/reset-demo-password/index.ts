@@ -1,17 +1,17 @@
 // ============================================================================
 // EPO.SI — Edge Function: reset-demo-password
 // ----------------------------------------------------------------------------
-// Ponastavi geslo obstoječega demo lokala (admin/owner uporabnik, ustvarjen
-// ob prvem provision-demo klicu). Uporabno, če ste geslo izgubili, ali če
-// isti demo pošiljate novi stranki. Vrne novo geslo — prikaže se SAMO enkrat,
-// v odgovoru te funkcije.
+// Resets the password of an existing demo tenant's admin/owner user (created
+// on the first provision-demo call). Useful if you lost the password, or if
+// you're sending the same demo to a new customer. Returns the new
+// password — it is shown ONLY once, in this function's response.
 //
-// NAMESTITEV (Supabase Dashboard, brez CLI): enako kot provision-demo — Edge
-// Functions → Deploy a new function → ime "reset-demo-password" → prilepite
-// to datoteko → Deploy.
+// DEPLOYMENT (Supabase Dashboard, no CLI): same as provision-demo — Edge
+// Functions → Deploy a new function → name "reset-demo-password" → paste
+// this file → Deploy.
 //
-// AVTORIZACIJA: glej provision-demo/index.ts — enak mehanizem (X-Epo-Auth
-// preverjen proti EPO.SI projektu).
+// AUTHORIZATION: see provision-demo/index.ts — same mechanism (X-Epo-Auth
+// verified against the EPO.SI project).
 // ============================================================================
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
