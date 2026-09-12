@@ -24,7 +24,7 @@
   width: 240px;
   flex: 0 0 240px;
   padding: 20px 14px;
-  background: rgba(10, 11, 20, 0.7);
+  background: rgba(23, 19, 15, 0.7);
   border-right: 1px solid var(--glass-border);
   backdrop-filter: blur(var(--glass-blur));
   display: flex; flex-direction: column; gap: 6px;
@@ -46,7 +46,7 @@
 .nav-link .icon { font-size: 1.2rem; width: 22px; text-align: center; }
 .nav-link:hover { background: var(--surface); }
 .nav-link.active {
-  background: linear-gradient(135deg, rgba(107, 63, 160, 0.35), rgba(46, 74, 139, 0.35));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--brand-primary) 35%, transparent), color-mix(in srgb, var(--brand-secondary) 35%, transparent));
   color: #fff;
 }
 .nav-link .pill {
@@ -64,7 +64,7 @@
 .bottom-tabs {
   display: none;
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
-  background: rgba(10, 11, 20, 0.94);
+  background: rgba(23, 19, 15, 0.94);
   border-top: 1px solid var(--glass-border);
   backdrop-filter: blur(var(--glass-blur));
   padding: 6px 4px calc(env(safe-area-inset-bottom) + 6px);

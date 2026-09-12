@@ -196,8 +196,8 @@ Deno.serve(async (req) => {
       {
         slug,
         name,
-        primary_color: body.primary_color || '#6B3FA0',
-        secondary_color: body.secondary_color || '#2E4A8B',
+        primary_color: body.primary_color || '#4a7fe0',
+        secondary_color: body.secondary_color || '#7ba3ec',
         logo_url: body.logo_url || null,
         currency: body.currency || '€',
         is_demo: true,

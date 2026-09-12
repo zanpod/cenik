@@ -1,43 +1,64 @@
 /* ===========================================================================
    EPO.SI — Common styles, dark theme, design tokens
-   Moody blue-purple gradients · glassmorphism · mobile-first
+   Isti sistem kot agencijaepo.si — topla temna paleta, en moder akcent,
+   samostojno gostovani pisavi (Inter/Quicksand) · glassmorphism · mobile-first
    =========================================================================== */
 
-:root {
-  /* Tenant-overridable brand accents (set at runtime via JS) */
-  --brand-primary: #6B3FA0;
-  --brand-secondary: #2E4A8B;
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/assets/fonts/inter-latin.woff2') format('woff2');
+}
 
-  /* Dark theme palette */
-  --bg-0: #0a0b14;
-  --bg-1: #0f1120;
-  --bg-2: #161a2e;
-  --surface: rgba(255, 255, 255, 0.04);
-  --surface-2: rgba(255, 255, 255, 0.07);
-  --glass-border: rgba(255, 255, 255, 0.10);
+@font-face {
+  font-family: 'Quicksand';
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url('/assets/fonts/quicksand-latin.woff2') format('woff2');
+}
+
+:root {
+  /* Tenant-overridable brand accents (set at runtime via JS) — privzeto
+     EPO.SI modra, isti odtenek kot na agencijaepo.si. */
+  --brand-primary: #4a7fe0;
+  --brand-secondary: #7ba3ec;
+
+  /* Topla temna paleta (ista kot agencijaepo.si) */
+  --bg-0: #17130f;
+  --bg-1: #1f1a14;
+  --bg-2: #29221a;
+  --surface: rgba(255, 247, 238, 0.04);
+  --surface-2: rgba(255, 247, 238, 0.08);
+  --glass-border: rgba(255, 244, 230, 0.12);
   --glass-blur: 16px;
 
-  --text-0: #f5f6ff;
-  --text-1: #c2c6e0;
-  --text-2: #8b8fb0;
-  --text-3: #5b5f80;
+  --text-0: #f6f0e6;
+  --text-1: #b3a696;
+  --text-2: #8a7d6d;
+  --text-3: #5c5346;
 
-  --success: #34d399;
+  --success: #8bab6f;
   --warning: #fbbf24;
-  --danger: #f87171;
+  --danger: #e0544a;
   --info: #60a5fa;
 
-  --radius-sm: 10px;
-  --radius: 16px;
-  --radius-lg: 24px;
+  --radius-sm: 8px;
+  --radius: 14px;
+  --radius-lg: 18px;
   --radius-pill: 999px;
 
-  --shadow-soft: 0 8px 30px rgba(0, 0, 0, 0.35);
-  --shadow-glow: 0 8px 40px rgba(107, 63, 160, 0.35);
+  --shadow-soft: 0 8px 24px rgba(13, 9, 6, 0.36);
+  --shadow-glow: 0 6px 18px rgba(74, 127, 224, 0.16);
 
   --tap: 44px; /* minimum tap target */
 
-  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --font-heading: 'Quicksand', system-ui, -apple-system, sans-serif;
+  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+
+  --ease: cubic-bezier(0.2, 0, 0, 1);
 }
 
 * { box-sizing: border-box; }
@@ -49,20 +70,15 @@ html, body {
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Inter,
-    'Helvetica Neue', Arial, sans-serif;
+  font-family: var(--font-body);
   color: var(--text-0);
-  background:
-    radial-gradient(1200px 800px at 15% -10%, rgba(107, 63, 160, 0.25), transparent 55%),
-    radial-gradient(1000px 700px at 110% 10%, rgba(46, 74, 139, 0.30), transparent 50%),
-    linear-gradient(160deg, var(--bg-0), var(--bg-1) 60%, var(--bg-2));
-  background-attachment: fixed;
+  background: var(--bg-0);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   line-height: 1.45;
 }
 
-h1, h2, h3, h4 { margin: 0 0 0.4em; font-weight: 700; letter-spacing: -0.01em; }
+h1, h2, h3, h4 { margin: 0 0 0.4em; font-family: var(--font-heading); font-weight: 700; letter-spacing: -0.01em; }
 p { margin: 0 0 0.8em; }
 
 a { color: inherit; text-decoration: none; }

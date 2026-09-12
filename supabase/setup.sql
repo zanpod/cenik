@@ -24,8 +24,8 @@ CREATE TABLE IF NOT EXISTS tenants (
   name TEXT NOT NULL,                    -- "Bar Lipa"
   slug TEXT UNIQUE NOT NULL,             -- "bar-lipa" (used in URL)
   logo_url TEXT,
-  primary_color TEXT DEFAULT '#6B3FA0',  -- brand color
-  secondary_color TEXT DEFAULT '#2E4A8B',
+  primary_color TEXT DEFAULT '#4a7fe0',  -- brand color
+  secondary_color TEXT DEFAULT '#7ba3ec',
   currency TEXT DEFAULT '€',
   sound_enabled BOOLEAN DEFAULT true,
   is_active BOOLEAN DEFAULT true,
@@ -358,7 +358,7 @@ END $$;
 
 -- Demo tenant
 INSERT INTO tenants (id, name, slug, primary_color, secondary_color, currency)
-VALUES ('11111111-1111-1111-1111-111111111111', 'Bar Lipa', 'bar-lipa', '#6B3FA0', '#2E4A8B', '€')
+VALUES ('11111111-1111-1111-1111-111111111111', 'Bar Lipa', 'bar-lipa', '#4a7fe0', '#7ba3ec', '€')
 ON CONFLICT (id) DO NOTHING;
 
 -- Categories
