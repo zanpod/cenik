@@ -26,6 +26,12 @@
     document.getElementById('add-ing').addEventListener('click', () => openModal());
     document.getElementById('ing-save').addEventListener('click', saveIngredient);
     document.getElementById('ing-unit').addEventListener('change', syncUnitLabels);
+    document.getElementById('ing-purchase').addEventListener('input', recalcSuggestedSale);
+    document.getElementById('ing-cost-ratio').addEventListener('input', recalcSuggestedSale);
+    document.getElementById('ing-use-suggested').addEventListener('click', () => {
+      const v = document.getElementById('ing-suggested-sale').value;
+      if (v) document.getElementById('ing-sale').value = v;
+    });
     document.querySelectorAll('[data-close]').forEach((b) =>
       b.addEventListener('click', () => document.getElementById(b.dataset.close).classList.remove('open')));
     document.getElementById('ing-modal').addEventListener('click', (e) => {
@@ -304,7 +310,20 @@
     document.getElementById('ing-sale').value = g ? (Number(g.sale_price || 0) * f) : 0;
     document.getElementById('ing-stock-field').style.display = g ? 'none' : '';
     document.getElementById('ing-stock').value = 0;
+    document.getElementById('ing-cost-ratio').value = 30;
+    recalcSuggestedSale();
     document.getElementById('ing-modal').classList.add('open');
+  }
+
+  // Predlagana prodajna cena po standardni gostinski formuli "delež stroška":
+  // cena = nabavna cena / delež stroška. 30 % je splošno pravilo; pijače, kjer
+  // je marža po navadi višja, gredo pogosto na 15-20 %. Samo predlog — polje
+  // prodajne cene ostane ročno urejljivo, "Uporabi" ga samo prekopira.
+  function recalcSuggestedSale() {
+    const purchase = Number(document.getElementById('ing-purchase').value) || 0;
+    const ratio = Math.min(95, Math.max(1, Number(document.getElementById('ing-cost-ratio').value) || 30));
+    const suggested = purchase > 0 ? purchase / (ratio / 100) : 0;
+    document.getElementById('ing-suggested-sale').value = suggested > 0 ? suggested.toFixed(4) : '';
   }
 
   async function saveIngredient() {

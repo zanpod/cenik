@@ -27,6 +27,12 @@
         <div class="field" style="flex:1"><label>Nabavna cena (na <span class="ing-punit">L</span>)</label><input class="input" type="number" step="0.0001" id="ing-purchase" value="0" /></div>
         <div class="field" style="flex:1"><label>Prodajna cena (na <span class="ing-punit">L</span>)</label><input class="input" type="number" step="0.0001" id="ing-sale" value="0" /></div>
       </div>
+      <div class="row wrap" style="align-items:flex-end;gap:8px;margin-bottom:14px">
+        <div class="field" style="flex:0 0 150px;margin:0"><label>Ciljni delež stroška (%)</label><input class="input" type="number" step="1" min="1" max="95" id="ing-cost-ratio" value="30" /></div>
+        <div class="field" style="flex:1;margin:0"><label>Predlagana prodajna cena</label><input class="input" readonly id="ing-suggested-sale" /></div>
+        <button class="btn btn-sm" type="button" id="ing-use-suggested">Uporabi</button>
+      </div>
+      <div class="muted" style="font-size:.78rem;margin:-8px 0 14px">Predlog = nabavna cena / delež stroška — standardno gostinsko pravilo je 30&nbsp;% (pijače, kjer je marža višja, gredo pogosto na 15–20&nbsp;%). Prilagodite po presoji.</div>
       <div class="field" id="ing-stock-field"><label>Začetna zaloga (<span class="ing-punit">L</span>)</label><input class="input" type="number" step="0.001" id="ing-stock" value="0" /></div>
       <div class="modal-actions">
         <button class="btn" data-close="ing-modal">Prekliči</button>
