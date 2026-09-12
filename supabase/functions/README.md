@@ -1,114 +1,117 @@
-# FURS davčno potrjevanje — Edge Funkcije + RUNBOOK (TEST → PROD)
+# FURS Tax Fiscalization — Edge Functions + RUNBOOK (TEST → PROD)
 
-Davčno potrjevanje računov po **ZDavPR**. Tehnična specifikacija FURS:
+Fiscalization of invoices under **ZDavPR** (the Slovenian Tax Verification of Invoices Act). FURS technical specification:
 <https://edavki.durs.si/edavkiportal/openportal/CommonPages/Opdynp/PageD.aspx?category=dpr_teh_spec>
 
-Privzeto je **izklopljeno** (vrne `501`, dokler ni `FURS_ENABLED=true` in certifikat).
-V TEST načinu dobite **pravi testni ZOI/EOR** iz FURS TEST sistema; računi **niso**
-pravno veljavni.
+By default it is **disabled** (returns `501` until `FURS_ENABLED=true` and a certificate are set).
+In TEST mode you get a **real test ZOI/EOR** from the FURS TEST system; the invoices are
+**not** legally valid.
 
-## Funkciji
+## Functions
 
-| Funkcija | Namen |
+| Function | Purpose |
 |---|---|
-| `furs-register-premise` | Enkratna registracija poslovnega prostora (pred 1. računom) |
-| `furs-fiscalize` | Potrditev računa → ZOI, EOR, QR; posodobi `invoices` |
+| `furs-register-premise` | One-time registration of the business premises (before the 1st invoice) |
+| `furs-fiscalize` | Confirms an invoice → ZOI, EOR, QR; updates `invoices` |
 
 ---
 
-## A) MVP v TEST okolju — korak za korakom
+## A) MVP in the TEST environment — step by step
 
-### 1. Testni certifikat
-V TEST okolju uporabite **testni digitalni certifikat FURS** (`.p12`), ki ga
-dobite iz FURS testnih materialov / na zahtevo (testno okolje `blagajne-test`).
-Production certifikat se pridobi prek **eDavki** (namenski certifikat za blagajne).
+### 1. Test certificate
+In the TEST environment, use the **FURS test digital certificate** (`.p12`), which you
+obtain from FURS test materials / on request (test environment `blagajne-test`).
+The production certificate is obtained via **eDavki** (a dedicated certificate for fiscal cash registers).
 
-Izvlecite PEM iz `.p12`:
+Extract the PEM from the `.p12`:
 
 ```bash
-openssl pkcs12 -in furs_test.p12 -nocerts -nodes -out furs_key.pem   # zasebni ključ
-openssl pkcs12 -in furs_test.p12 -clcerts -nokeys -out furs_cert.pem  # certifikat
+openssl pkcs12 -in furs_test.p12 -nocerts -nodes -out furs_key.pem   # private key
+openssl pkcs12 -in furs_test.p12 -clcerts -nokeys -out furs_cert.pem  # certificate
 ```
 
-### 2. Skrivnosti v Supabase
+### 2. Secrets in Supabase
 
 ```bash
 supabase secrets set FURS_ENABLED=true
 supabase secrets set FURS_ENV=test
 supabase secrets set FURS_PRIVATE_KEY_PEM="$(cat furs_key.pem)"
 supabase secrets set FURS_CERT_PEM="$(cat furs_cert.pem)"
-# Neobvezno, a pogosto potrebno: veriga CA strežnika FURS (sigov-ca / SI-TRUST),
-# sicer lahko klic spodleti z napako preverjanja TLS certifikata.
+# Optional, but often required: the CA chain of the FURS server (sigov-ca / SI-TRUST),
+# otherwise the call may fail with a TLS certificate verification error.
 supabase secrets set FURS_CA_PEM="$(cat furs_ca_chain.pem)"
 ```
 
-> CA verigo FURS test strežnika (`blagajne-test.fu.gov.si`) dobiš med tehničnimi
-> materiali FURS ali jo izvoziš iz povezave (npr. `openssl s_client -connect
-> blagajne-test.fu.gov.si:9002 -showcerts`). Združi root + vmesne certifikate v
-> en PEM in nastavi kot `FURS_CA_PEM`.
+> You can get the CA chain of the FURS test server (`blagajne-test.fu.gov.si`) from FURS
+> technical materials, or export it from the connection itself (e.g. `openssl s_client -connect
+> blagajne-test.fu.gov.si:9002 -showcerts`). Combine the root + intermediate certificates into
+> a single PEM and set it as `FURS_CA_PEM`.
 
-`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` so samodejni.
+`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` are set automatically.
 
-### 3. Objava funkcij
+### 3. Deploying the functions
 
 ```bash
 supabase functions deploy furs-register-premise
 supabase functions deploy furs-fiscalize
 ```
 
-### 4. Nastavitve lokala (admin → Nastavitve)
-- **Izdajanje računov**: davčna številka (= davčna iz certifikata!), zavezanec za
-  DDV (da/ne), stopnja DDV, oznaka poslovnega prostora + blagajne.
-- **Davčno potrjevanje (FURS)**: vklopi stikalo → **Shrani**.
+### 4. Venue settings (admin → Settings)
+- **Invoice issuing**: tax number (= the tax number on the certificate!), VAT
+  liable (yes/no), VAT rate, business premises code + cash register code.
+- **Tax fiscalization (FURS)**: turn on the toggle → **Save**.
 
-### 5. Registracija poslovnega prostora
-Admin → Nastavitve → **Registriraj poslovni prostor (FURS)** (enkrat).
-- Gumb privzeto pošlje *premično napravo* (`C`) — primerno za TEST.
-- Za **fiksni prostor** je treba poslati podatke o nepremičnini (kataster,
-  št. stavbe/dela, naslov). Pokličite funkcijo z `real_estate` telesom
-  (primer v `furs-register-premise/index.ts`).
+### 5. Registering the business premises
+Admin → Settings → **Register business premises (FURS)** (once).
+- By default the button submits a *mobile device* (`C`) — suitable for TEST.
+- For a **fixed premises** you need to submit real-estate data (cadastral
+  number, building/part number, address). Call the function with a
+  `real_estate` body (example in `furs-register-premise/index.ts`).
 
-### 6. Testna izdaja računa
-Nadzorna plošča → miza → **Račun / zapri mizo** → izberi postavke → obračunaj.
-Ob uspehu dobi račun **ZOI, EOR in QR**. Preverite v dnevniku funkcije
-(`supabase functions logs furs-fiscalize`) odgovor FURS.
+### 6. Issuing a test invoice
+Dashboard → table → **Invoice / close table** → select items → charge.
+On success the invoice receives a **ZOI, EOR and QR**. Check the FURS
+response in the function log (`supabase functions logs furs-fiscalize`).
 
-### 7. Validacija / odpravljanje napak
-FURS vrne v odgovoru `Error.ErrorCode` + `ErrorMessage`. Najpogostejše:
-- napaka pri **certifikatu/glavi JWS** → preverite obliko `subject_name`/
-  `issuer_name` v `_shared/furs.ts` (`formatDN`) — mora ustrezati certifikatu;
-- **ZOI** zavrnjen → preverite vrstni red/format datuma (`yyyy-MM-ddTHH:mm:ss`,
-  cona Europe/Ljubljana) in znesek (2 decimalki);
-- **poslovni prostor ni registriran** → najprej korak 5;
-- napaka TLS (veriga `sigov-ca`) → po potrebi dodajte FURS CA v zaupanja vredne.
+### 7. Validation / troubleshooting
+FURS returns `Error.ErrorCode` + `ErrorMessage` in its response. Most common:
+- an error in the **certificate/JWS header** → check the format of
+  `subject_name`/`issuer_name` in `_shared/furs.ts` (`formatDN`) — it must
+  match the certificate;
+- **ZOI** rejected → check the date order/format (`yyyy-MM-ddTHH:mm:ss`,
+  Europe/Ljubljana zone) and the amount (2 decimal places);
+- **business premises not registered** → do step 5 first;
+- TLS error (`sigov-ca` chain) → add the FURS CA to your trusted store if needed.
 
-> Te tri stvari (DN glave, format datuma, struktura `TaxesPerSeller`) so edine,
-> ki lahko zahtevajo manjši popravek — vse je na enem mestu v `_shared/furs.ts`
-> in `furs-fiscalize/index.ts`. Pošljite mi `ErrorMessage` in popravim točno to.
+> These three things (DN headers, date format, `TaxesPerSeller` structure) are the
+> only ones that may need a small fix — everything is in one place, in
+> `_shared/furs.ts` and `furs-fiscalize/index.ts`. Send me the `ErrorMessage`
+> and I'll fix exactly that.
 
 ---
 
-## B) Preklop v PRODUKCIJO
+## B) Switching to PRODUCTION
 
-1. Pridobite **produkcijski** certifikat (eDavki) in z njim ponovite korak 1.
-2. Posodobite skrivnosti:
+1. Obtain the **production** certificate (eDavki) and repeat step 1 with it.
+2. Update the secrets:
    ```bash
    supabase secrets set FURS_ENV=prod
    supabase secrets set FURS_PRIVATE_KEY_PEM="$(cat furs_key_prod.pem)"
    supabase secrets set FURS_CERT_PEM="$(cat furs_cert_prod.pem)"
    ```
-3. **Registrirajte poslovni prostor v PROD** (korak 5) — z resničnimi podatki o
-   nepremičnini.
-4. Objavite funkciji (če sta se spremenili) in v Nastavitvah pustite **FURS
-   vklopljen**.
-5. Od zdaj imajo računi ZOI/EOR/QR in opozorilo »testni račun« izgine.
-   Obvezno hranite **kopije računov** in poskrbite za vmesno potrditev
-   (nakn%adni `SubsequentSubmit=true`), če je blagajna občasno brez povezave.
+3. **Register the business premises in PROD** (step 5) — with real
+   real-estate data.
+4. Deploy the functions (if changed) and leave **FURS
+   enabled** in Settings.
+5. From now on, invoices carry ZOI/EOR/QR and the "test invoice"
+   warning disappears. Make sure to keep **copies of invoices** and set up
+   subsequent submission (`SubsequentSubmit=true`) in case the cash register
+   is occasionally offline.
 
 ---
 
-## Kako koda ve, ali je test ali prod?
-- Strežnik: `FURS_ENV` (test/prod) → ustrezna končna točka.
-- Aplikacija: `tenants.fiscal_enabled` (stikalo v Nastavitvah) → ali sploh
-  kliče potrjevanje. Če je izklopljeno ALI certifikat ni nastavljen, je račun
-  testni/nepotrjen in tako tudi označen.
+## How does the code know whether it's test or prod?
+- Server side: `FURS_ENV` (test/prod) → the matching endpoint.
+- Application side: `tenants.fiscal_enabled` (the toggle in Settings) → whether
+  fiscalization is called at all. If it's disabled OR no certificate is set, the
+  invoice is a test/unconfirmed one and is marked as such.
