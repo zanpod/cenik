@@ -53,12 +53,12 @@
         <div class="row wrap" style="justify-content:space-between;gap:10px">
           <span class="muted" style="font-size:.85rem">Nabavna cena sestavin: <strong id="item-cost-value">—</strong></span>
         </div>
-        <div class="row" style="margin-top:8px;gap:8px;align-items:flex-end">
-          <div class="field" style="flex:0 0 100px;margin:0"><label>Marža (%)</label><input class="input" type="number" step="1" min="0" max="95" id="item-margin" value="70" /></div>
-          <div class="field" style="flex:1;margin:0"><label>Priporočena cena</label><input class="input" id="item-suggested-price" readonly /></div>
+        <div class="row" style="margin-top:4px;gap:8px;align-items:flex-end">
+          <div class="field" style="flex:1;margin:0"><label>Prodajna vrednost sestavin (priporočena cena)</label><input class="input" id="item-suggested-price" readonly /></div>
           <button class="btn btn-sm" type="button" id="item-use-suggested">Uporabi</button>
         </div>
-        <div class="muted" style="font-size:.78rem;margin-top:6px">Priporočena cena = nabavna cena sestavin deljena z (1 − marža). Marža 70&nbsp;% pomeni, da sestavine predstavljajo ~30&nbsp;% cene — nastavite po želji.</div>
+        <div class="muted" style="font-size:.78rem;margin-top:6px" id="item-profit-line"></div>
+        <div style="font-size:.78rem;margin-top:4px;color:var(--warning);display:none" id="item-sale-price-warning">⚠ Nekatere uporabljene surovine nimajo nastavljene prodajne cene (Zaloge → Uredi surovino) — vrednost spodaj je zato prenizka.</div>
       </div>
       <div class="field"><label>Slika</label><input class="input" type="file" id="item-image" accept="image/*" /><div id="item-image-preview" class="muted" style="margin-top:6px"></div></div>
       <div class="field"><label>Pripravljalno mesto (bon)</label>

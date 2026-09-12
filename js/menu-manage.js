@@ -33,7 +33,6 @@
     document.getElementById('ing-add').addEventListener('click', addIngredient);
     document.getElementById('item-add-ingredient').addEventListener('click', () => { recipeRows.push({ ingredient_id: '', quantity: 0 }); renderRecipeRows(); });
     document.getElementById('item-add-variant').addEventListener('click', () => { variantRows.push({ name: '', price: 0 }); renderVariantRows(); });
-    document.getElementById('item-margin').addEventListener('input', recalcItemCost);
     document.getElementById('item-use-suggested').addEventListener('click', () => {
       const v = document.getElementById('item-suggested-price').value;
       if (v) document.getElementById('item-price').value = v;
@@ -149,26 +148,41 @@
     recalcItemCost();
   }
 
-  // Nabavna cena sestavin za 1 kos izdelka + priporočena prodajna cena, da
-  // sestavine predstavljajo željen delež (marža) končne cene. Samo predlog —
-  // "Uporabi" prepiše polje s ceno, ki ostane ročno urejljivo.
+  // Priporočena cena izdelka = vsota PRODAJNE cene porabljenih surovin (ne
+  // nabavne + izmišljena marža) — vsaka surovina ima svojo prodajno ceno
+  // nastavljeno v Zalogah, ki že vključuje želeni zaslužek zanjo. Nabavna
+  // cena se prikaže samo za primerjavo (dobiček/marža izdelka). Samo predlog
+  // — "Uporabi" prepiše polje s ceno, ki ostane ročno urejljivo.
   function recalcItemCost() {
     const costEl = document.getElementById('item-cost-value');
     const suggEl = document.getElementById('item-suggested-price');
+    const profitEl = document.getElementById('item-profit-line');
+    const warnEl = document.getElementById('item-sale-price-warning');
     if (!costEl || !suggEl) return;
 
-    const cost = recipeRows.reduce((sum, r) => {
+    let cost = 0;
+    let saleValue = 0;
+    let missingSalePrice = false;
+    recipeRows.forEach((r) => {
       const ing = ingredients.find((g) => g.id === r.ingredient_id);
-      if (!ing || !r.quantity) return sum;
-      return sum + toPurchaseQty(r.quantity, ing.unit) * Number(ing.purchase_price || 0);
-    }, 0);
+      if (!ing || !r.quantity) return;
+      const qty = toPurchaseQty(r.quantity, ing.unit);
+      cost += qty * Number(ing.purchase_price || 0);
+      saleValue += qty * Number(ing.sale_price || 0);
+      if (!ing.sale_price) missingSalePrice = true;
+    });
 
     const currency = (tenant && tenant.currency) || '€';
     costEl.textContent = formatPrice(cost, currency);
+    suggEl.value = saleValue > 0 ? saleValue.toFixed(2) : '';
 
-    const margin = Math.min(95, Math.max(0, Number(document.getElementById('item-margin').value) || 0));
-    const suggested = cost > 0 ? cost / (1 - margin / 100) : 0;
-    suggEl.value = suggested > 0 ? suggested.toFixed(2) : '';
+    if (profitEl) {
+      const profit = saleValue - cost;
+      profitEl.textContent = saleValue > 0
+        ? `Dobiček pri tej ceni: ${formatPrice(profit, currency)} (${saleValue ? Math.round((profit / saleValue) * 100) : 0} % marže)`
+        : '';
+    }
+    if (warnEl) warnEl.style.display = (missingSalePrice && recipeRows.length) ? '' : 'none';
   }
 
   function render() {
@@ -316,7 +330,6 @@
     document.getElementById('item-name').value = it?.name || '';
     document.getElementById('item-desc').value = it?.description || '';
     document.getElementById('item-price').value = it?.price ?? '';
-    document.getElementById('item-margin').value = 70;
     document.getElementById('item-sort').value = it?.sort_order ?? 0;
     document.getElementById('item-allergens').value = it?.allergens || '';
     document.getElementById('item-vat').value = (it?.vat_rate ?? '') === null ? '' : (it?.vat_rate ?? '');
