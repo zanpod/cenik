@@ -317,13 +317,20 @@
 
   // Predlagana prodajna cena po standardni gostinski formuli "delež stroška":
   // cena = nabavna cena / delež stroška. 30 % je splošno pravilo; pijače, kjer
-  // je marža po navadi višja, gredo pogosto na 15-20 %. Samo predlog — polje
-  // prodajne cene ostane ročno urejljivo, "Uporabi" ga samo prekopira.
+  // je marža po navadi višja, gredo pogosto na 15-20 %. Dokler prodajna cena
+  // ni bila ročno nastavljena (je še 0), jo predlog samodejno izpolni — sicer
+  // bi ostala 0, če bi kdo pozabil klikniti "Uporabi". "Uporabi" ostane za
+  // primer, ko je uporabnik prodajno ceno že spremenil, pa si premisli.
   function recalcSuggestedSale() {
     const purchase = Number(document.getElementById('ing-purchase').value) || 0;
     const ratio = Math.min(95, Math.max(1, Number(document.getElementById('ing-cost-ratio').value) || 30));
     const suggested = purchase > 0 ? purchase / (ratio / 100) : 0;
     document.getElementById('ing-suggested-sale').value = suggested > 0 ? suggested.toFixed(4) : '';
+
+    const saleEl = document.getElementById('ing-sale');
+    if (suggested > 0 && (Number(saleEl.value) || 0) === 0) {
+      saleEl.value = suggested.toFixed(4);
+    }
   }
 
   async function saveIngredient() {
