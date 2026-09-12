@@ -12,6 +12,13 @@
   let editingCatId = null;
   let editingItemId = null;
 
+  // Sestavine se v recepturi vnašajo v OSNOVNI enoti (g / ml / kos, enako kot
+  // stock_quantity — glej migracijo 004), nabavna cena pa je shranjena na
+  // NABAVNO enoto (kg / L / kos, glej js/inventory.js). Pretvorba mora biti
+  // ista na obeh mestih, da se "nabavna cena sestavin" ujema z zalogo.
+  const unitFactor = (b) => (b === 'ml' || b === 'g' ? 1000 : 1);
+  const toPurchaseQty = (baseQty, b) => Number(baseQty) / unitFactor(b);
+
   async function init() {
     const ctx = await AdminShell.init('menu', 'Upravljanje menija');
     if (!ctx) return;
@@ -26,6 +33,11 @@
     document.getElementById('ing-add').addEventListener('click', addIngredient);
     document.getElementById('item-add-ingredient').addEventListener('click', () => { recipeRows.push({ ingredient_id: '', quantity: 0 }); renderRecipeRows(); });
     document.getElementById('item-add-variant').addEventListener('click', () => { variantRows.push({ name: '', price: 0 }); renderVariantRows(); });
+    document.getElementById('item-margin').addEventListener('input', recalcItemCost);
+    document.getElementById('item-use-suggested').addEventListener('click', () => {
+      const v = document.getElementById('item-suggested-price').value;
+      if (v) document.getElementById('item-price').value = v;
+    });
     wireModals();
     await load();
   }
@@ -113,19 +125,50 @@
   // --- Receptura v item modalu ----------------------------------------------
   function renderRecipeRows() {
     const host = document.getElementById('item-recipe-rows');
-    if (!recipeRows.length) { host.innerHTML = '<p class="muted" style="font-size:.82rem;margin:0">Ni sestavin.</p>'; return; }
-    host.innerHTML = recipeRows.map((r, idx) => `
-      <div class="row" style="margin-bottom:6px">
-        <select class="select recipe-ing" data-idx="${idx}" style="flex:1">
-          <option value="">— izberi surovino —</option>
-          ${ingredients.map((g) => `<option value="${g.id}" ${g.id === r.ingredient_id ? 'selected' : ''}>${esc(g.name)} (${esc(g.unit)})</option>`).join('')}
-        </select>
-        <input class="input recipe-qty" data-idx="${idx}" type="number" step="0.001" value="${r.quantity}" style="width:110px" placeholder="količina" />
-        <button class="btn btn-sm btn-danger recipe-del" data-idx="${idx}" type="button">🗑</button>
-      </div>`).join('');
-    host.querySelectorAll('.recipe-ing').forEach((s) => s.addEventListener('change', (e) => { recipeRows[+e.target.dataset.idx].ingredient_id = e.target.value; }));
-    host.querySelectorAll('.recipe-qty').forEach((s) => s.addEventListener('input', (e) => { recipeRows[+e.target.dataset.idx].quantity = Number(e.target.value) || 0; }));
-    host.querySelectorAll('.recipe-del').forEach((b) => b.addEventListener('click', (e) => { recipeRows.splice(+e.target.dataset.idx, 1); renderRecipeRows(); }));
+    if (!recipeRows.length) { host.innerHTML = '<p class="muted" style="font-size:.82rem;margin:0">Ni sestavin.</p>'; }
+    else {
+      host.innerHTML = recipeRows.map((r, idx) => `
+        <div class="row" style="margin-bottom:6px">
+          <select class="select recipe-ing" data-idx="${idx}" style="flex:1">
+            <option value="">— izberi surovino —</option>
+            ${ingredients.map((g) => `<option value="${g.id}" ${g.id === r.ingredient_id ? 'selected' : ''}>${esc(g.name)} (${esc(g.unit)})</option>`).join('')}
+          </select>
+          <input class="input recipe-qty" data-idx="${idx}" type="number" step="0.001" value="${r.quantity}" style="width:110px" placeholder="količina" />
+          <button class="btn btn-sm btn-danger recipe-del" data-idx="${idx}" type="button">🗑</button>
+        </div>`).join('');
+      host.querySelectorAll('.recipe-ing').forEach((s) => s.addEventListener('change', (e) => {
+        recipeRows[+e.target.dataset.idx].ingredient_id = e.target.value; recalcItemCost();
+      }));
+      host.querySelectorAll('.recipe-qty').forEach((s) => s.addEventListener('input', (e) => {
+        recipeRows[+e.target.dataset.idx].quantity = Number(e.target.value) || 0; recalcItemCost();
+      }));
+      host.querySelectorAll('.recipe-del').forEach((b) => b.addEventListener('click', (e) => {
+        recipeRows.splice(+e.target.dataset.idx, 1); renderRecipeRows();
+      }));
+    }
+    recalcItemCost();
+  }
+
+  // Nabavna cena sestavin za 1 kos izdelka + priporočena prodajna cena, da
+  // sestavine predstavljajo željen delež (marža) končne cene. Samo predlog —
+  // "Uporabi" prepiše polje s ceno, ki ostane ročno urejljivo.
+  function recalcItemCost() {
+    const costEl = document.getElementById('item-cost-value');
+    const suggEl = document.getElementById('item-suggested-price');
+    if (!costEl || !suggEl) return;
+
+    const cost = recipeRows.reduce((sum, r) => {
+      const ing = ingredients.find((g) => g.id === r.ingredient_id);
+      if (!ing || !r.quantity) return sum;
+      return sum + toPurchaseQty(r.quantity, ing.unit) * Number(ing.purchase_price || 0);
+    }, 0);
+
+    const currency = (tenant && tenant.currency) || '€';
+    costEl.textContent = formatPrice(cost, currency);
+
+    const margin = Math.min(95, Math.max(0, Number(document.getElementById('item-margin').value) || 0));
+    const suggested = cost > 0 ? cost / (1 - margin / 100) : 0;
+    suggEl.value = suggested > 0 ? suggested.toFixed(2) : '';
   }
 
   function render() {
@@ -273,6 +316,7 @@
     document.getElementById('item-name').value = it?.name || '';
     document.getElementById('item-desc').value = it?.description || '';
     document.getElementById('item-price').value = it?.price ?? '';
+    document.getElementById('item-margin').value = 70;
     document.getElementById('item-sort').value = it?.sort_order ?? 0;
     document.getElementById('item-allergens').value = it?.allergens || '';
     document.getElementById('item-vat').value = (it?.vat_rate ?? '') === null ? '' : (it?.vat_rate ?? '');
