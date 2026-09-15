@@ -411,25 +411,35 @@
 
     const { data: links, error: linkErr } = await sb.from('item_ingredients')
       .select('menu_item_id').in('ingredient_id', ids);
-    if (linkErr || !links || !links.length) return;
+    if (linkErr) { console.error(linkErr); toast('Napaka pri iskanju izdelkov s to surovino.', 'error'); return; }
+    if (!links || !links.length) return; // no menu item uses this ingredient — nothing to do, nothing to report
     const itemIds = [...new Set(links.map((l) => l.menu_item_id))];
 
-    const [{ data: allLinks }, { data: items }] = await Promise.all([
-      sb.from('item_ingredients').select('menu_item_id, quantity, ingredients(sale_price)').in('menu_item_id', itemIds),
+    const [{ data: allLinks, error: allLinksErr }, { data: items, error: itemsErr }] = await Promise.all([
+      sb.from('item_ingredients').select('menu_item_id, quantity, ingredients(name, sale_price)').in('menu_item_id', itemIds),
       sb.from('menu_items').select('id, name, price').in('id', itemIds),
     ]);
+    if (allLinksErr || itemsErr) {
+      console.error(allLinksErr || itemsErr);
+      toast('Napaka pri preračunu cen izdelkov — cene niso bile posodobljene.', 'error', 7000);
+      return;
+    }
 
     const changes = [];
+    const blocked = [];
     for (const item of items || []) {
       const rows = (allLinks || []).filter((l) => l.menu_item_id === item.id);
-      if (!rows.length || rows.some((r) => !r.ingredients?.sale_price)) continue; // incomplete pricing — leave it, don't guess
+      const missing = rows.find((r) => !r.ingredients?.sale_price);
+      if (!rows.length) continue;
+      if (missing) { blocked.push(`${esc(item.name)} (${esc(missing.ingredients?.name || 'sestavina')} nima prodajne cene)`); continue; }
       const newPrice = Number(rows.reduce((sum, r) => sum + Number(r.quantity) * Number(r.ingredients.sale_price), 0).toFixed(2));
       if (Math.abs(newPrice - Number(item.price)) < 0.005) continue;
       const { error: updErr } = await sb.from('menu_items').update({ price: newPrice }).eq('id', item.id);
-      if (updErr) { console.error(updErr); continue; }
+      if (updErr) { console.error(updErr); blocked.push(`${esc(item.name)} (napaka pri shranjevanju)`); continue; }
       changes.push(`${esc(item.name)}: ${formatPrice(item.price, cur())} → ${formatPrice(newPrice, cur())}`);
     }
     if (changes.length) toast(`Cene izdelkov posodobljene — ${changes.join('; ')}`, 'success', 9000);
+    if (blocked.length) toast(`Cene NISO bile posodobljene za: ${blocked.join('; ')}`, 'error', 9000);
   }
 
   async function del(id) {
