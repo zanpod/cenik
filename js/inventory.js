@@ -9,6 +9,7 @@
   let ingredients = [];
   let tab = 'surovine'; // ingredients | prevzem (intake) | popis (stocktake)
   let editingId = null;
+  let saleManuallyEdited = false; // true once the owner types into "Prodajna cena" directly this session
 
   const purchaseUnit = (b) => (b === 'ml' ? 'L' : b === 'g' ? 'kg' : 'kos');
   const factor = (b) => (b === 'ml' || b === 'g' ? 1000 : 1);   // base unit per purchase unit
@@ -28,6 +29,7 @@
     document.getElementById('ing-unit').addEventListener('change', syncUnitLabels);
     document.getElementById('ing-purchase').addEventListener('input', recalcSuggestedSale);
     document.getElementById('ing-cost-ratio').addEventListener('input', recalcSuggestedSale);
+    document.getElementById('ing-sale').addEventListener('input', () => { saleManuallyEdited = true; });
     document.getElementById('ing-use-suggested').addEventListener('click', () => {
       const v = document.getElementById('ing-suggested-sale').value;
       if (v) document.getElementById('ing-sale').value = v;
@@ -152,7 +154,21 @@
         if (error) throw error;
       }
       toast('Prevzem shranjen.', 'success');
-      await notifyAffectedItems(ops.filter((o) => o.price !== null).map((o) => o.id));
+
+      // Prevzem only edits purchase price (no ratio field on this screen) —
+      // recompute each changed ingredient's sale price from its own saved
+      // target_cost_ratio, then cascade into menu item prices the same way
+      // the ingredient edit modal does.
+      const pricedIds = ops.filter((o) => o.price !== null).map((o) => o.id);
+      if (pricedIds.length) {
+        const { data: fresh } = await sb.from('ingredients').select('*').in('id', pricedIds);
+        for (const ing of fresh || []) {
+          const ratio = Number(ing.target_cost_ratio) || 30;
+          const newSale = Number(ing.purchase_price || 0) / (ratio / 100);
+          if (newSale > 0) await sb.from('ingredients').update({ sale_price: newSale }).eq('id', ing.id);
+        }
+        await cascadeToMenuItems(pricedIds);
+      }
       await load();
     } catch (err) {
       console.error(err); toast('Napaka pri prevzemu: ' + (err.message || ''), 'error', 6000);
@@ -313,18 +329,21 @@
     document.getElementById('ing-sale').value = g ? (Number(g.sale_price || 0) * f) : 0;
     document.getElementById('ing-stock-field').style.display = g ? 'none' : '';
     document.getElementById('ing-stock').value = 0;
-    document.getElementById('ing-cost-ratio').value = 30;
+    document.getElementById('ing-cost-ratio').value = g?.target_cost_ratio ?? 30;
+    saleManuallyEdited = false;
     recalcSuggestedSale();
     document.getElementById('ing-modal').classList.add('open');
   }
 
   // Suggested sale price using the standard hospitality "cost ratio" formula:
   // price = purchase price / cost ratio. 30% is the general rule of thumb;
-  // drinks, where margins are usually higher, often use 15-20%. As long as
-  // the sale price hasn't been manually set yet (still 0), the suggestion
-  // auto-fills it — otherwise it would stay 0 if someone forgot to click
-  // "Use". The "Use" button remains for when the user already changed the
-  // sale price and wants to revert to the suggestion.
+  // drinks, where margins are usually higher, often use 15-20% — set per
+  // ingredient and saved (target_cost_ratio, migration 015), not reset to 30
+  // on every edit. The sale price keeps following purchase price × ratio
+  // live (that's the point — a price change should cascade automatically,
+  // not require re-clicking "Use" every time) unless the owner has typed
+  // directly into "Prodajna cena" this session, which is respected as a
+  // deliberate one-off override for that save.
   function recalcSuggestedSale() {
     const purchase = Number(document.getElementById('ing-purchase').value) || 0;
     const ratio = Math.min(95, Math.max(1, Number(document.getElementById('ing-cost-ratio').value) || 30));
@@ -332,7 +351,7 @@
     document.getElementById('ing-suggested-sale').value = suggested > 0 ? suggested.toFixed(4) : '';
 
     const saleEl = document.getElementById('ing-sale');
-    if (suggested > 0 && (Number(saleEl.value) || 0) === 0) {
+    if (suggested > 0 && !saleManuallyEdited) {
       saleEl.value = suggested.toFixed(4);
     }
   }
@@ -343,18 +362,23 @@
     if (!name) return toast('Vnesite naziv.', 'error');
     const f = factor(unit);
     const newPurchasePrice = (Number(document.getElementById('ing-purchase').value) || 0) / f;
+    const newSalePrice = (Number(document.getElementById('ing-sale').value) || 0) / f;
     const payload = {
       tenant_id: tenant.id, name, unit,
       purchase_price: newPurchasePrice,
-      sale_price: (Number(document.getElementById('ing-sale').value) || 0) / f,
+      sale_price: newSalePrice,
+      target_cost_ratio: Number(document.getElementById('ing-cost-ratio').value) || 30,
     };
     if (!editingId) payload.stock_quantity = toBase(Number(document.getElementById('ing-stock').value) || 0, unit);
 
-    // Detect a real purchase-price change on an existing ingredient, so we
-    // can log it (traceability — see migration 014) and flag menu items that
-    // may need their price re-checked, without having to open each one.
+    // Detect a real price change on an existing ingredient (purchase and/or
+    // sale — a ratio-only edit can change sale_price with purchase_price
+    // unchanged), so we can log it (traceability — see migration 014) and
+    // cascade the new price into every menu item that uses it.
     const existing = editingId ? ingredients.find((g) => g.id === editingId) : null;
-    const priceChanged = !!existing && Number(existing.purchase_price) !== newPurchasePrice;
+    const priceChanged = !!existing && (
+      Number(existing.purchase_price) !== newPurchasePrice || Number(existing.sale_price) !== newSalePrice
+    );
 
     const q = editingId
       ? sb.from('ingredients').update(payload).eq('id', editingId)
@@ -371,26 +395,41 @@
 
     document.getElementById('ing-modal').classList.remove('open');
     toast('Shranjeno.', 'success');
-    if (priceChanged) await notifyAffectedItems([editingId], name);
+    if (priceChanged) await cascadeToMenuItems([editingId]);
     await load();
   }
 
-  // After a purchase-price change, tell the owner which menu items use this
-  // ingredient — so they know what to go check without having to open every
-  // item individually. Doesn't touch item prices itself; those stay a
-  // deliberate manual decision (see js/menu-manage.js).
-  async function notifyAffectedItems(ingredientIds, singleName) {
-    const ids = [...new Set(ingredientIds)];
+  // Once an ingredient's sale price changes, push that straight into the
+  // price of every menu item that uses it — the owner wants prices to
+  // actually update, since the target margin is already set per ingredient,
+  // not just get suggested and require reopening each item. Recomputes each
+  // affected item's price as sum(recipe quantity * ingredient.sale_price),
+  // same formula js/menu-manage.js uses for its own live suggestion.
+  async function cascadeToMenuItems(ingredientIds) {
+    const ids = [...new Set(ingredientIds)].filter(Boolean);
     if (!ids.length) return;
-    const { data, error } = await sb.from('item_ingredients')
-      .select('ingredient_id, menu_items(name)')
-      .in('ingredient_id', ids);
-    if (error || !data || !data.length) return;
-    const names = [...new Set(data.map((r) => r.menu_items?.name).filter(Boolean))];
-    if (!names.length) return;
-    const list = names.length > 4 ? `${names.slice(0, 4).join(', ')} +${names.length - 4}` : names.join(', ');
-    const subject = singleName ? `Cena za "${singleName}" je bila posodobljena` : 'Nabavne cene so bile posodobljene';
-    toast(`${subject}. Uporablja se v: ${list} — preverite njihove cene v Meniju.`, 'success', 8000);
+
+    const { data: links, error: linkErr } = await sb.from('item_ingredients')
+      .select('menu_item_id').in('ingredient_id', ids);
+    if (linkErr || !links || !links.length) return;
+    const itemIds = [...new Set(links.map((l) => l.menu_item_id))];
+
+    const [{ data: allLinks }, { data: items }] = await Promise.all([
+      sb.from('item_ingredients').select('menu_item_id, quantity, ingredients(sale_price)').in('menu_item_id', itemIds),
+      sb.from('menu_items').select('id, name, price').in('id', itemIds),
+    ]);
+
+    const changes = [];
+    for (const item of items || []) {
+      const rows = (allLinks || []).filter((l) => l.menu_item_id === item.id);
+      if (!rows.length || rows.some((r) => !r.ingredients?.sale_price)) continue; // incomplete pricing — leave it, don't guess
+      const newPrice = Number(rows.reduce((sum, r) => sum + Number(r.quantity) * Number(r.ingredients.sale_price), 0).toFixed(2));
+      if (Math.abs(newPrice - Number(item.price)) < 0.005) continue;
+      const { error: updErr } = await sb.from('menu_items').update({ price: newPrice }).eq('id', item.id);
+      if (updErr) { console.error(updErr); continue; }
+      changes.push(`${esc(item.name)}: ${formatPrice(item.price, cur())} → ${formatPrice(newPrice, cur())}`);
+    }
+    if (changes.length) toast(`Cene izdelkov posodobljene — ${changes.join('; ')}`, 'success', 9000);
   }
 
   async function del(id) {
