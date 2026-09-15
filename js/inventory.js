@@ -142,14 +142,17 @@
     const btn = document.getElementById('prevzem-save');
     btn.disabled = true; btn.textContent = 'Shranjujem…';
     try {
+      // Always go through receive_ingredient, even for a price-only row
+      // (deltaBase 0) — it logs the movement (with price, if given) in one
+      // atomic call, so every price change has a traceable history entry.
       for (const op of ops) {
-        if (op.price !== null) await sb.from('ingredients').update({ purchase_price: op.price }).eq('id', op.id);
-        if (op.deltaBase !== 0) {
-          const { error } = await sb.rpc('receive_ingredient', { p_ingredient_id: op.id, p_delta: op.deltaBase, p_reason: 'intake', p_note: 'prevzem' });
-          if (error) throw error;
-        }
+        const { error } = await sb.rpc('receive_ingredient', {
+          p_ingredient_id: op.id, p_delta: op.deltaBase, p_reason: 'intake', p_note: 'prevzem', p_price: op.price,
+        });
+        if (error) throw error;
       }
       toast('Prevzem shranjen.', 'success');
+      await notifyAffectedItems(ops.filter((o) => o.price !== null).map((o) => o.id));
       await load();
     } catch (err) {
       console.error(err); toast('Napaka pri prevzemu: ' + (err.message || ''), 'error', 6000);
@@ -339,20 +342,55 @@
     const unit = document.getElementById('ing-unit').value;
     if (!name) return toast('Vnesite naziv.', 'error');
     const f = factor(unit);
+    const newPurchasePrice = (Number(document.getElementById('ing-purchase').value) || 0) / f;
     const payload = {
       tenant_id: tenant.id, name, unit,
-      purchase_price: (Number(document.getElementById('ing-purchase').value) || 0) / f,
+      purchase_price: newPurchasePrice,
       sale_price: (Number(document.getElementById('ing-sale').value) || 0) / f,
     };
     if (!editingId) payload.stock_quantity = toBase(Number(document.getElementById('ing-stock').value) || 0, unit);
+
+    // Detect a real purchase-price change on an existing ingredient, so we
+    // can log it (traceability — see migration 014) and flag menu items that
+    // may need their price re-checked, without having to open each one.
+    const existing = editingId ? ingredients.find((g) => g.id === editingId) : null;
+    const priceChanged = !!existing && Number(existing.purchase_price) !== newPurchasePrice;
+
     const q = editingId
       ? sb.from('ingredients').update(payload).eq('id', editingId)
       : sb.from('ingredients').insert(payload);
     const { error } = await q;
     if (error) { console.error(error); return toast('Napaka: ' + (error.message || ''), 'error', 6000); }
+
+    if (priceChanged) {
+      const { error: logErr } = await sb.from('ingredient_movements').insert({
+        tenant_id: tenant.id, ingredient_id: editingId, delta: 0, reason: 'price_update', price: newPurchasePrice,
+      });
+      if (logErr) console.error(logErr); // non-fatal — the price itself is already saved
+    }
+
     document.getElementById('ing-modal').classList.remove('open');
     toast('Shranjeno.', 'success');
+    if (priceChanged) await notifyAffectedItems([editingId], name);
     await load();
+  }
+
+  // After a purchase-price change, tell the owner which menu items use this
+  // ingredient — so they know what to go check without having to open every
+  // item individually. Doesn't touch item prices itself; those stay a
+  // deliberate manual decision (see js/menu-manage.js).
+  async function notifyAffectedItems(ingredientIds, singleName) {
+    const ids = [...new Set(ingredientIds)];
+    if (!ids.length) return;
+    const { data, error } = await sb.from('item_ingredients')
+      .select('ingredient_id, menu_items(name)')
+      .in('ingredient_id', ids);
+    if (error || !data || !data.length) return;
+    const names = [...new Set(data.map((r) => r.menu_items?.name).filter(Boolean))];
+    if (!names.length) return;
+    const list = names.length > 4 ? `${names.slice(0, 4).join(', ')} +${names.length - 4}` : names.join(', ');
+    const subject = singleName ? `Cena za "${singleName}" je bila posodobljena` : 'Nabavne cene so bile posodobljene';
+    toast(`${subject}. Uporablja se v: ${list} — preverite njihove cene v Meniju.`, 'success', 8000);
   }
 
   async function del(id) {
