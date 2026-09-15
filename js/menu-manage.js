@@ -12,14 +12,6 @@
   let editingCatId = null;
   let editingItemId = null;
 
-  // Ingredients in a recipe are entered in the BASE unit (g / ml / kos, same
-  // as stock_quantity — see migration 004), while the purchase price is
-  // stored per PURCHASE unit (kg / L / kos, see js/inventory.js). The
-  // conversion must be identical in both places so "ingredient cost" matches
-  // the stock figures.
-  const unitFactor = (b) => (b === 'ml' || b === 'g' ? 1000 : 1);
-  const toPurchaseQty = (baseQty, b) => Number(baseQty) / unitFactor(b);
-
   async function init() {
     const ctx = await AdminShell.init('menu', 'Upravljanje menija');
     if (!ctx) return;
@@ -168,9 +160,14 @@
     recipeRows.forEach((r) => {
       const ing = ingredients.find((g) => g.id === r.ingredient_id);
       if (!ing || !r.quantity) return;
-      const qty = toPurchaseQty(r.quantity, ing.unit);
-      cost += qty * Number(ing.purchase_price || 0);
-      saleValue += qty * Number(ing.sale_price || 0);
+      // ingredients.purchase_price / sale_price are stored PER BASE UNIT
+      // (per g / per ml / per kos — see js/inventory.js, which divides the
+      // per-kg/L price the owner types by 1000 before saving). Recipe
+      // quantities are also in base units, so no conversion is needed here —
+      // multiplying by a purchase-unit quantity (as a previous version did)
+      // silently undercounted cost by 1000x for weight/volume ingredients.
+      cost += r.quantity * Number(ing.purchase_price || 0);
+      saleValue += r.quantity * Number(ing.sale_price || 0);
       if (!ing.sale_price) missingSalePrice = true;
     });
 
