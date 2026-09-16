@@ -9,7 +9,6 @@
   let activeFilter = 'tables';  // tables | new | served | today
   let stationById = {};
   let soundEnabled = true;
-  let timeTimer = null;
 
   const FILTERS = [
     { key: 'tables',    label: 'Po mizah' },
@@ -34,7 +33,7 @@
     window.addEventListener('epo:invoiced', loadOrders);
 
     // Refresh "time ago" labels every 30s.
-    timeTimer = setInterval(updateTimes, 30000);
+    setInterval(updateTimes, 30000);
   }
 
   function renderHeaderActions() {
@@ -394,7 +393,6 @@
   const AudioChime = (() => {
     let ctxA = null;
     let audioEl = null;
-    let unlocked = false;
 
     function ensure() {
       if (!audioEl) {
@@ -404,7 +402,6 @@
     }
     function unlock() {
       ensure();
-      unlocked = true;
       // Prime the audio element so later playback isn't blocked.
       audioEl.play().then(() => { audioEl.pause(); audioEl.currentTime = 0; }).catch(() => {});
     }

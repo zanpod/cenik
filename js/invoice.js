@@ -423,8 +423,6 @@ const Invoice = (() => {
       : `<div>Davčna številka: ${esc(inv.seller_tax_number || '—')}</div>
          <div class="rcpt-note-small">DDV ni obračunan na podlagi 1. odst. 94. člena ZDDV-1 (nisem zavezanec za DDV).</div>`;
 
-    const cols = inv.seller_vat_registered ? 5 : 4;
-
     const fiscalBlock = (inv.is_fiscal && inv.eor)
       ? `${qrImg ? `<div class="rcpt-qr"><img src="${qrImg}" alt="FURS QR" width="140" height="140"></div>` : ''}
          <div class="rcpt-row"><span>ZOI:</span><span>${esc(inv.zoi || '—')}</span></div>
