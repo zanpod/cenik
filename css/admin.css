@@ -147,10 +147,20 @@
 
 /* --- Tables / cards generic ------------------------------------------------*/
 .card { padding: 18px; }
-.list-card { padding: 16px; display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
-.list-card .grow { flex: 1; min-width: 0; }
+.list-card { padding: 16px; display: flex; align-items: center; gap: 14px; margin-bottom: 12px; flex-wrap: wrap; }
+.list-card .grow { flex: 1; min-width: 160px; }
 .list-card .title { font-weight: 700; }
 .list-card .sub { color: var(--text-2); font-size: 0.85rem; }
+
+/* Action buttons/toggle at the end of a list row — on a narrow screen there
+   isn't room for image + text + every button on one line (the row used to
+   just squeeze .grow down to a sliver, wrapping its text one letter per
+   line instead of actually reflowing). Group them so they drop to their own
+   row together instead. */
+.list-card-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+@media (max-width: 640px) {
+  .list-card-actions { flex-basis: 100%; margin-left: 0; justify-content: flex-end; padding-top: 10px; border-top: 1px solid var(--glass-border); }
+}
 
 .data-table { width: 100%; border-collapse: collapse; }
 .data-table th, .data-table td { text-align: left; padding: 12px 10px; border-bottom: 1px solid var(--glass-border); }

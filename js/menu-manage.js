@@ -233,15 +233,17 @@
           <div class="title">${esc(it.name)} ${it.is_available ? '' : '<span class="badge badge-cancelled">Ni na voljo</span>'}${stockTag(it)}</div>
           <div class="sub">${formatPrice(it.price, tenant.currency)}${it.description ? ' · ' + esc(it.description) : ''}</div>
         </div>
-        ${it.track_stock ? `<button class="btn btn-sm" data-restock="${it.id}" title="Dopolni zalogo">📦 +</button>` : ''}
-        <label class="switch" title="Na voljo">
-          <input type="checkbox" data-avail="${it.id}" ${it.is_available ? 'checked' : ''}/>
-          <span class="track"></span>
-        </label>
-        <button class="btn btn-sm btn-icon" data-item-up="${it.id}" ${idx === 0 ? 'disabled' : ''}>↑</button>
-        <button class="btn btn-sm btn-icon" data-item-down="${it.id}" ${idx === total - 1 ? 'disabled' : ''}>↓</button>
-        <button class="btn btn-sm" data-item-edit="${it.id}">Uredi</button>
-        <button class="btn btn-sm btn-danger" data-item-del="${it.id}">🗑</button>
+        <div class="list-card-actions">
+          ${it.track_stock ? `<button class="btn btn-sm" data-restock="${it.id}" title="Dopolni zalogo">📦 +</button>` : ''}
+          <label class="switch" title="Na voljo">
+            <input type="checkbox" data-avail="${it.id}" ${it.is_available ? 'checked' : ''}/>
+            <span class="track"></span>
+          </label>
+          <button class="btn btn-sm btn-icon" data-item-up="${it.id}" ${idx === 0 ? 'disabled' : ''}>↑</button>
+          <button class="btn btn-sm btn-icon" data-item-down="${it.id}" ${idx === total - 1 ? 'disabled' : ''}>↓</button>
+          <button class="btn btn-sm" data-item-edit="${it.id}">Uredi</button>
+          <button class="btn btn-sm btn-danger" data-item-del="${it.id}">🗑</button>
+        </div>
       </div>`;
   }
 
