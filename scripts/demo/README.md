@@ -37,13 +37,13 @@ column and a function for cleaning up orders) — if you haven't already.
 
 ## 2. Creating a new demo
 
-1. Copy `examples/kavarna-vahtnca.json` to a new file, e.g.
+1. Copy `examples/testni-lokal.json` to a new file, e.g.
    `demos/my-customer.json`, and fill in the venue's details:
 
    ```json
    {
-     "slug": "kavarna-vahtnca",
-     "name": "Kavarna VAHTNCA",
+     "slug": "testni-lokal",
+     "name": "Testni lokal",
      "primary_color": "#8B5A2B",
      "logo_url": "",
      "categories": [

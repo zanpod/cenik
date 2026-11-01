@@ -13,8 +13,8 @@
 
   // --- Parse URL ------------------------------------------------------------
   function parseUrl() {
-    // Path like /menu/bar-lipa  (Netlify rewrites /menu/* -> /menu/index.html)
-    const parts = location.pathname.split('/').filter(Boolean); // ["menu","bar-lipa"]
+    // Path like /menu/testni-lokal  (Netlify rewrites /menu/* -> /menu/index.html)
+    const parts = location.pathname.split('/').filter(Boolean); // ["menu","testni-lokal"]
     const slug = parts[1] || new URLSearchParams(location.search).get('tenant');
     const token = new URLSearchParams(location.search).get('table');
     return { slug, token };
