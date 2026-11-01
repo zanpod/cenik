@@ -41,10 +41,13 @@
         const btn = document.getElementById('login-btn');
         btn.disabled = true; btn.textContent = 'Prijavljam…';
         const email = document.getElementById('email').value.trim();
-        const password = document.getElementById('password').value;
+        // Presledke odrežemo tudi pri geslu: pri kopiranju iz e-pošte se rad
+        // prilepi presledek na koncu, ustvarjena gesla pa jih nikoli nimajo.
+        const password = document.getElementById('password').value.trim();
         const { error } = await sb.auth.signInWithPassword({ email, password });
         if (error) {
-          toast('Napačna e-pošta ali geslo.', 'error');
+          const bad = /invalid login credentials|invalid_credentials/i.test(error.message || '') || error.code === 'invalid_credentials';
+          toast(bad ? 'Napačna e-pošta ali geslo.' : `Prijava ni uspela: ${error.message}`, 'error');
           btn.disabled = false; btn.textContent = 'Prijava';
           return;
         }
