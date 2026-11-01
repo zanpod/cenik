@@ -318,3 +318,115 @@ body.menu-body {
   transition: transform 0.3s var(--ease);
 }
 .offline-banner.show { transform: translateY(0); }
+
+/* ===========================================================================
+   GOSTILNIŠKI SLOG — gostova stran (meni na mizi)
+   Kremast papir, gozdno zelena, les, slab-serif naslovi, pikčaste vodilne
+   črte do cen kot na tiskanem jedilnem listu. Barve lokala (tenants.
+   primary_color) še vedno prepišejo --brand-primary.
+   =========================================================================== */
+body.menu-body {
+  --brand-primary: #22392a;   /* gozdno zelena (privzeto, lokal jo lahko zamenja) */
+  --brand-secondary: #7a4b27; /* les */
+  --paper: #fbf7ee;
+  --cream: #f4ecdc;
+  --cream-2: #eadfc8;
+  --ink: #24211b;
+  --ink-2: #5b5446;
+  --line: rgba(36, 33, 27, 0.18);
+  --red: #a3302a;
+  --serif: 'Rockwell', 'Roboto Slab', 'Zilla Slab', 'Georgia', 'Times New Roman', serif;
+  --font-heading: var(--serif);
+  --text-0: var(--ink);
+  --text-1: #3d382f;
+  --text-2: var(--ink-2);
+  --text-3: #7a715f;
+  --glass-border: var(--line);
+  --danger: var(--red);
+  background:
+    radial-gradient(circle at 20% 0%, rgba(255,255,255,.55), transparent 60%),
+    var(--cream);
+  color: var(--ink);
+}
+.menu-body h1, .menu-body h2, .menu-body h3 { font-family: var(--serif); font-weight: 700; letter-spacing: 0; }
+
+/* Glava: kot vrh jedilnega lista */
+.menu-header {
+  background: var(--cream);
+  backdrop-filter: none;
+  border-bottom: 1px solid var(--line);
+  box-shadow: 0 1px 0 rgba(255,255,255,.6) inset;
+}
+.demo-banner {
+  background: transparent; border: 1px dashed var(--brand-secondary); color: var(--brand-secondary);
+  border-radius: 3px; font-family: var(--font-mono); text-transform: none; letter-spacing: 0; font-weight: 600;
+}
+.tenant-logo { border-radius: 50%; border: 2px solid var(--brand-primary); background: var(--paper); }
+.tenant-name { font-family: var(--serif); font-size: 1.4rem; font-weight: 700; letter-spacing: 0; color: var(--brand-primary); }
+.table-pill {
+  background: transparent; color: var(--ink); box-shadow: none;
+  border: 1.5px solid var(--ink); border-radius: 3px;
+  font-family: var(--serif); font-size: 0.95rem; padding: 4px 10px;
+}
+
+/* Kategorije: zavihki kot črke na tabli */
+.cat-tab {
+  background: transparent; border: 1px solid transparent; border-radius: 3px;
+  color: var(--ink-2); font-family: var(--serif); font-weight: 700; min-height: 38px; padding: 0 12px;
+}
+.cat-tab.active { background: var(--brand-primary); color: var(--paper); border-color: var(--brand-primary); box-shadow: none; }
+.cat-tab:active { transform: none; }
+
+/* Naslov kategorije z okrasno črto */
+.cat-heading {
+  font-family: var(--serif); font-size: 1.35rem; font-weight: 700; color: var(--brand-primary);
+  margin: 26px 2px 4px; gap: 12px; letter-spacing: 0.01em;
+}
+.cat-heading::after { content: ''; flex: 1; height: 0; border-top: 3px double var(--brand-secondary); opacity: .6; }
+.cat-heading:first-child { margin-top: 10px; }
+
+/* Postavke: papir, brez kartic in senc */
+.menu-list { gap: 0; padding-top: 4px; }
+.menu-item.glass, .menu-item {
+  background: transparent; border: 0; border-bottom: 1px dotted var(--line);
+  border-radius: 0; box-shadow: none; padding: 14px 2px; backdrop-filter: none;
+}
+.item-thumb { border-radius: 4px; border: 1px solid var(--line); background: var(--cream-2); }
+.item-name { font-family: var(--serif); font-size: 1.08rem; font-weight: 700; display: flex; align-items: baseline; gap: 6px; }
+.item-desc { color: var(--ink-2); font-style: italic; }
+.item-allergens { color: var(--text-3); font-family: var(--font-mono); font-size: 0.7rem; }
+.item-price { font-family: var(--serif); font-size: 1.12rem; font-weight: 700; color: var(--ink); white-space: nowrap; }
+.item-price::before { content: ''; }
+.na-badge { background: transparent; border: 1px solid var(--red); color: var(--red); border-radius: 3px; font-family: var(--serif); font-style: italic; }
+
+/* Gumbi + / − : okrogli žigi */
+.step-btn { background: var(--paper); border: 1.5px solid var(--ink); color: var(--ink); box-shadow: none; }
+.step-btn.add { background: var(--brand-primary); border-color: var(--brand-primary); color: var(--paper); box-shadow: none; }
+.step-btn:active { transform: scale(0.92); }
+.step-qty { font-family: var(--serif); }
+.variant-chip { background: var(--brand-primary); color: var(--paper); border-radius: 3px; font-family: var(--serif); }
+
+/* Košarica */
+.cart-bar {
+  background: var(--brand-primary); color: var(--paper); border-radius: 6px;
+  box-shadow: 0 10px 28px rgba(34, 57, 42, .28);
+}
+.cart-bar-count { background: var(--paper); color: var(--brand-primary); border-radius: 3px; font-family: var(--serif); }
+.cart-bar-label, .cart-bar-total { font-family: var(--serif); }
+.sheet-backdrop { background: rgba(36, 33, 27, .45); backdrop-filter: none; }
+.cart-sheet { background: var(--paper); border-color: var(--line); border-radius: 10px 10px 0 0; }
+.sheet-handle { background: var(--cream-2); }
+.sheet-footer { background: var(--cream); border-top-color: var(--line); }
+.cart-line { border-bottom: 1px dotted var(--line); }
+.cart-line-name, .line-total, .summary-total { font-family: var(--serif); }
+.menu-body .btn-primary { background: var(--brand-primary); border-color: var(--brand-primary); color: var(--paper); font-family: var(--serif); font-size: 1.05rem; }
+.menu-body .btn-primary:hover { background: var(--brand-secondary); border-color: var(--brand-secondary); }
+.menu-body .input, .menu-body .textarea { background: #fffdf8; border-color: var(--line); }
+
+/* Potrditev in stanja */
+.confirm-overlay { background: rgba(244, 236, 220, .94); backdrop-filter: none; }
+.confirm-card.glass { background: var(--paper); border: 1px solid var(--line); box-shadow: 0 20px 50px rgba(36,33,27,.18); }
+.confirm-card h2 { color: var(--brand-primary); }
+.offline-banner { background: var(--red); color: #fff; }
+/* Brez slike: na tiskanem jedilnem listu ni praznih sličic z emojiji */
+.item-thumb.placeholder { display: none; }

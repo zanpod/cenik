@@ -260,3 +260,38 @@
   .qr-card .qr-title, .qr-card .qr-sub { color: #000 !important; }
   .qr-card .qr-actions { display: none !important; }
 }
+
+/* ===========================================================================
+   Admin osebja — svetla izvedba v slogu agencijaepo.si
+   Grafit, ena barva lokala, ravni robovi, brez stekla in prelivov.
+   =========================================================================== */
+.login-logo, .sidebar-logo {
+  background: none; -webkit-text-fill-color: currentColor; color: var(--text-0);
+  font-family: var(--font-heading); font-weight: 750; letter-spacing: -0.01em;
+}
+.login-card { border: 1px solid var(--glass-border); box-shadow: var(--shadow-soft); }
+.login-card h1 { color: var(--text-2); }
+.sidebar { background: var(--surface); backdrop-filter: none; }
+.sidebar-tenant { font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-3); }
+.nav-link { color: var(--text-2); }
+.nav-link:hover { background: var(--bg-2); color: var(--text-0); }
+.nav-link.active { background: transparent; color: var(--text-0); box-shadow: inset 2px 0 0 var(--brand-primary); }
+.nav-link .pill { background: var(--text-0); color: var(--bg-0); border-radius: 3px; }
+.admin-header h1 { font-family: var(--font-heading); letter-spacing: -0.01em; }
+.bottom-tabs { background: var(--surface); backdrop-filter: none; }
+.bottom-tabs a.active { color: var(--brand-primary); }
+.filter-tab { border-radius: 3px; background: var(--surface); }
+.filter-tab.active { background: var(--text-0); color: var(--bg-0); border-color: var(--text-0); }
+.filter-tab .count { background: rgba(32, 30, 27, 0.08); border-radius: 3px; }
+.filter-tab.active .count { background: rgba(255, 255, 255, 0.18); }
+.order-card.glass { border: 1px solid var(--glass-border); }
+.order-table-num { background: var(--text-0); color: var(--bg-0); box-shadow: none; border-radius: var(--radius-sm); font-family: var(--font-heading); }
+.order-item-qty { color: var(--brand-primary); font-family: var(--font-mono); }
+.order-note-box { background: color-mix(in srgb, var(--warning) 8%, transparent); border-color: color-mix(in srgb, var(--warning) 30%, transparent); }
+.table-round { background: var(--bg-0); }
+@keyframes flash {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--success) 50%, transparent); }
+  100% { box-shadow: 0 0 0 14px transparent; }
+}
+.modal-backdrop, .modal-overlay { background: rgba(31, 30, 27, 0.45) !important; backdrop-filter: none !important; }
+.switch .track { background: rgba(32, 30, 27, 0.18); }
