@@ -12,8 +12,8 @@
     if (!ctx) return;
     tenant = ctx.tenant;
     document.getElementById('header-actions').innerHTML =
-      '<button class="btn btn-sm" id="z-report">📊 Z-poročilo (dan)</button>' +
-      '<button class="btn btn-sm" id="export-csv">⬇ Izvozi CSV</button>';
+      '<button class="btn btn-sm" id="z-report">Z-poročilo (dan)</button>' +
+      '<button class="btn btn-sm" id="export-csv">Izvozi CSV</button>';
     document.getElementById('export-csv').addEventListener('click', exportCsv);
     document.getElementById('z-report').addEventListener('click', zReport);
 
@@ -137,7 +137,7 @@
     const label = t ? (t.label || `Miza ${t.table_number}`) : 'Miza ?';
     const items = o.items.map((i) => `${i.quantity}× ${esc(i.item_name)}`).join(', ');
     const invBtn = o.status !== 'cancelled'
-      ? `<button class="btn btn-sm" data-invoice="${o.id}" data-label="${esc(label)}">🧾 Račun</button>` : '';
+      ? `<button class="btn btn-sm" data-invoice="${o.id}" data-label="${esc(label)}">Račun</button>` : '';
     return `<tr>
       <td>${formatDateTime(o.created_at)}</td>
       <td>${esc(label)}</td>

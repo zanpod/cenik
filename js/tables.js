@@ -13,7 +13,7 @@
     if (!ctx) return;
     tenant = ctx.tenant;
     document.getElementById('header-actions').innerHTML = `
-      <button class="btn btn-sm no-print" id="print-all">🖨 Natisni vse QR kode</button>
+      <button class="btn btn-sm no-print" id="print-all">Natisni vse QR kode</button>
       <button class="btn btn-primary btn-sm no-print" id="add-table">＋ Dodaj mizo</button>`;
     document.getElementById('add-table').addEventListener('click', () => openModal());
     document.getElementById('print-all').addEventListener('click', () => window.print());
@@ -53,7 +53,7 @@
         <div class="qr-sub">${esc(menuUrl(t))}</div>
         ${t.is_active ? '' : '<span class="badge badge-cancelled" style="margin-bottom:8px">Neaktivna</span>'}
         <div class="qr-actions no-print">
-          <button class="btn btn-sm" data-dl="${t.id}">⬇ Prenesi</button>
+          <button class="btn btn-sm" data-dl="${t.id}">Prenesi</button>
           <button class="btn btn-sm" data-edit="${t.id}">Uredi</button>
           <button class="btn btn-sm btn-danger" data-del="${t.id}">🗑</button>
         </div>
