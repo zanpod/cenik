@@ -70,6 +70,15 @@ async function main() {
         currency: input.currency || '€',
         is_demo: true,
         is_active: true,
+        // Podatki za račune vedno prazni (enako kot Edge Function provision-demo)
+        business_name: null,
+        address: null,
+        tax_number: null,
+        vat_registered: false,
+        default_vat_rate: 22,
+        premise_label: 'P1',
+        device_label: 'BL1',
+        fiscal_enabled: false,
       },
       { onConflict: 'slug' }
     )
