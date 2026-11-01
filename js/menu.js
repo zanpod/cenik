@@ -10,6 +10,7 @@
   let categories = [];
   let menuItems = [];
   let activeCategoryId = null;
+  let spyLockUntil = 0; // after a tab tap, keep that tab active while the page scrolls
 
   // --- Parse URL ------------------------------------------------------------
   function parseUrl() {
@@ -110,10 +111,11 @@
     categories.forEach((c) => {
       const tab = document.createElement('button');
       tab.className = 'cat-tab' + (c.id === activeCategoryId ? ' active' : '');
-      tab.innerHTML = `${c.icon ? esc(c.icon) + ' ' : ''}<span>${esc(c.name)}</span>`;
+      tab.innerHTML = `<span>${esc(c.name)}</span>`;
       tab.dataset.cat = c.id;
       tab.addEventListener('click', () => {
         activeCategoryId = c.id;
+        spyLockUntil = Date.now() + 1000;
         document.querySelectorAll('.cat-tab').forEach((t) => t.classList.toggle('active', t.dataset.cat === c.id));
         const heading = document.getElementById(`cat-${c.id}`);
         if (heading) heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -137,7 +139,7 @@
       const heading = document.createElement('h2');
       heading.className = 'cat-heading';
       heading.id = `cat-${cat.id}`;
-      heading.innerHTML = `${cat.icon ? esc(cat.icon) + ' ' : ''}${esc(cat.name)}`;
+      heading.innerHTML = `<span class="cat-heading-text">${esc(cat.name)}</span>`;
       host.appendChild(heading);
       inCat.forEach((item) => host.appendChild(renderItemCard(item)));
     });
@@ -147,10 +149,15 @@
     if (orphans.length) {
       const heading = document.createElement('h2');
       heading.className = 'cat-heading';
-      heading.textContent = 'Ostalo';
+      heading.innerHTML = '<span class="cat-heading-text">Ostalo</span>';
       host.appendChild(heading);
       orphans.forEach((item) => host.appendChild(renderItemCard(item)));
     }
+
+    const foot = document.createElement('p');
+    foot.className = 'menu-footnote';
+    foot.textContent = 'Cene vključujejo DDV. Za informacije o alergenih vprašajte osebje.';
+    host.appendChild(foot);
 
     // Highlight active tab while scrolling
     observeScroll();
@@ -186,17 +193,20 @@
         </div>
       </div>`;
 
+    const price = `${hasVariants ? 'od ' : ''}${formatPrice(hasVariants ? Math.min(...item.variants.map((v) => v.price)) : item.price, tenant.currency)}`;
     card.innerHTML = `
-      ${thumb}
+      ${item.image_url ? thumb : ''}
       <div class="item-main">
-        <div class="item-name">${esc(item.name)}</div>
-        ${item.description ? `<div class="item-desc">${esc(item.description)}</div>` : ''}
-        ${item.allergens ? `<div class="item-allergens">⚠️ ${esc(item.allergens)}</div>` : ''}
-        <div class="item-bottom">
-          <span class="item-price">${hasVariants ? 'od ' : ''}${formatPrice(hasVariants ? Math.min(...item.variants.map((v) => v.price)) : item.price, tenant.currency)}</span>
-          ${controls}
+        <div class="item-line">
+          <span class="item-name">${esc(item.name)}</span>
+          <span class="item-dots" aria-hidden="true"></span>
+          <span class="item-price">${price}</span>
         </div>
-      </div>`;
+        ${item.description ? `<div class="item-desc">${esc(item.description)}</div>` : ''}
+        ${item.allergens ? `<div class="item-allergens">Alergeni: ${esc(item.allergens)}</div>` : ''}
+        ${hasVariants || !orderable ? `<div class="item-extra">${controls}</div>` : ''}
+      </div>
+      ${orderable && !hasVariants ? `<div class="item-action">${controls}</div>` : ''}`;
 
     if (orderable && hasVariants) {
       card.querySelectorAll('.variant-chip').forEach((chip) => chip.addEventListener('click', () => {
@@ -237,16 +247,42 @@
     const headings = categories
       .map((c) => document.getElementById(`cat-${c.id}`))
       .filter(Boolean);
-    if (!headings.length || !('IntersectionObserver' in window)) return;
-    const obs = new IntersectionObserver((entries) => {
-      const visible = entries.filter((e) => e.isIntersecting)
-        .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
-      if (!visible) return;
-      const id = visible.target.id.replace('cat-', '');
-      document.querySelectorAll('.cat-tab').forEach((t) => t.classList.toggle('active', t.dataset.cat === id));
-    }, { rootMargin: '-30% 0px -60% 0px' });
-    headings.forEach((h) => obs.observe(h));
+    if (!headings.length) return;
+    const header = document.querySelector('.menu-header');
+    let current = null;
+    let ticking = false;
+    // Active section = the last heading that has passed just under the sticky
+    // header; at the very bottom of the page, the last section.
+    const update = () => {
+      ticking = false;
+      if (Date.now() < spyLockUntil) { current = null; return; }
+      const line = (header ? header.getBoundingClientRect().bottom : 0) + 40;
+      let active = headings[0];
+      for (const h of headings) if (h.getBoundingClientRect().top <= line) active = h;
+      if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4) active = headings[headings.length - 1];
+      const id = active.id.replace('cat-', '');
+      if (id === current) return;
+      current = id;
+      const strip = document.getElementById('cat-tabs');
+      strip.querySelectorAll('.cat-tab').forEach((t) => {
+        const on = t.dataset.cat === id;
+        t.classList.toggle('active', on);
+        // Keep the active tab visible in the horizontal strip (without
+        // scrollIntoView, which would also move the page).
+        if (on) {
+          const left = strip.scrollLeft + t.getBoundingClientRect().left - strip.getBoundingClientRect().left - 20;
+          strip.scrollTo({ left: Math.max(0, left), behavior: 'smooth' });
+        }
+      });
+    };
+    window.addEventListener('scroll', () => {
+      if (!ticking) { ticking = true; requestAnimationFrame(update); }
+    }, { passive: true });
+    // First check on the next frame: renderItems runs while the menu is
+    // still hidden, so positions are only known once it is shown.
+    requestAnimationFrame(update);
   }
+
 
   // --- Cart wiring ----------------------------------------------------------
   function wireCart() {

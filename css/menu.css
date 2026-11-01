@@ -344,6 +344,7 @@ body.menu-body {
 .menu-body h1, .menu-body h2, .menu-body h3 { font-family: var(--serif); color: var(--forest); font-weight: 700; letter-spacing: 0; line-height: 1.1; }
 .menu-body :focus-visible { outline: 3px solid var(--red); outline-offset: 2px; }
 
+/* --- Skupna pravila (tudi admin »Novo naročilo«, ki deli menu.css) --- */
 /* Glava: zelen pas kot na strani gostilne */
 .menu-header {
   background: var(--forest); color: var(--cream);
@@ -432,6 +433,146 @@ body.menu-body {
 .cart-line-name { font-weight: 600; }
 .line-total { color: var(--wood); }
 .summary-total { font-family: var(--serif); color: var(--forest); }
+/* ===========================================================================
+   JEDILNI LIST ZA GOSTE — tipografska postavitev (ime ····· cena),
+   diskretni gumbi, ornamentni naslovi. Vse omejeno na .menu-body, da
+   adminova stran »Novo naročilo« ostane nespremenjena.
+   =========================================================================== */
+/* Glava: zelen pas kot na strani gostilne */
+.menu-body .menu-header {
+  background: var(--forest); color: var(--cream);
+  backdrop-filter: none; box-shadow: 0 1px 0 rgba(0, 0, 0, .08); border: 0;
+  padding: calc(env(safe-area-inset-top) + 12px) 20px 0;
+}
+.menu-body .menu-header::after {
+  content: ''; display: block; height: 6px; margin: 0 -20px;
+  background: repeating-conic-gradient(var(--red) 0 25%, var(--paper) 0 50%) 0 0 / 12px 12px;
+}
+.menu-body .demo-banner {
+  display: block; margin: 0 0 12px; padding: 0; border: 0; background: none;
+  color: rgba(201, 214, 196, .75); text-align: left;
+  font: 600 .62rem/1.3 var(--font-body); letter-spacing: .18em; text-transform: uppercase;
+}
+.menu-body .demo-banner span { color: var(--pale); }
+.menu-body .menu-header-top { gap: 14px; align-items: flex-end; }
+.menu-body .tenant-logo { width: 48px; height: 48px; border-radius: 50%; border: 1.5px solid rgba(244, 236, 220, .5); background: var(--paper); }
+.menu-body .tenant-name {
+  font-family: var(--serif); font-size: 1.75rem; font-weight: 700; letter-spacing: -.01em;
+  color: #fff; line-height: 1; text-transform: capitalize;
+}
+.menu-body .tenant-name::after {
+  content: 'Jedilni list'; display: block; margin-top: .45rem; text-transform: uppercase;
+  font: 600 .62rem/1 var(--font-body); letter-spacing: .24em; color: var(--pale);
+}
+.menu-body .table-pill {
+  background: rgba(244, 236, 220, .1); color: var(--cream); box-shadow: none;
+  border: 0; border-radius: 999px; padding: 7px 12px;
+  font: 600 .72rem/1 var(--font-body); letter-spacing: .08em; text-transform: uppercase;
+}
+.menu-body /* Kategorije: tipografski zavihki s podčrtom, .menu-body brez okvirjev */
+.cat-tabs {
+  padding: 16px 0 8px; margin: 0 -20px; padding-inline: 20px; gap: 22px;
+  scroll-padding-inline: 20px;
+  -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent);
+          mask-image: linear-gradient(90deg, #000 85%, transparent);
+}
+.menu-body .cat-tab {
+  min-height: 40px; padding: 0 0 2px; border: 0; border-radius: 0; background: none; box-shadow: none;
+  color: rgba(244, 236, 220, .62); font: 600 .9rem/1 var(--font-body); letter-spacing: .01em;
+  border-bottom: 2px solid transparent; transition: color .2s, border-color .2s;
+}
+.menu-body .cat-tab.active { background: none; color: #fff; border-bottom-color: var(--red); box-shadow: none; }
+.menu-body .cat-tab:active { transform: none; }
+.menu-body /* Jedilni list: papirnat list, .menu-body klasična postavitev ime ····· cena */
+.menu-list {
+  gap: 0; margin: 20px 12px 0; padding: 8px 22px 150px; flex: 1;
+  background: var(--paper); border: 0; border-radius: 4px 4px 0 0;
+  box-shadow: 0 1px 2px rgba(36, 33, 27, .06), 0 8px 24px rgba(36, 33, 27, .06);
+}
+.menu-body .cat-heading {
+  display: flex; align-items: center; gap: 14px; margin: 38px 0 10px; padding: 0; border: 0;
+  font-family: var(--serif); font-size: 1.32rem; font-weight: 700; color: var(--forest);
+  scroll-margin-top: 150px; text-align: center;
+}
+.menu-body .cat-heading::before, .menu-body .cat-heading::after {
+  content: ''; flex: 1; height: 0; border-top: 1px solid rgba(34, 57, 42, .35);
+}
+.menu-body .cat-heading:first-child { margin-top: 22px; }
+.menu-body .cat-heading-text { flex: 0 1 auto; }
+.menu-body .menu-item, .menu-body .menu-item.glass {
+  display: flex; align-items: flex-start; gap: 14px;
+  background: transparent; border: 0; border-radius: 0; box-shadow: none; backdrop-filter: none;
+  padding: 14px 0;
+}
+.menu-body .menu-item + .menu-item { border-top: 1px solid rgba(36, 33, 27, .07); }
+.menu-body .item-thumb { width: 60px; height: 60px; border-radius: 4px; border: 0; background: var(--cream-2); }
+.menu-body .item-line { display: flex; align-items: baseline; gap: 8px; }
+.menu-body .item-name { font: 600 1rem/1.3 var(--font-body); color: var(--ink); min-width: 0; }
+.menu-body .item-dots { flex: 1; min-width: 16px; border-bottom: 1.5px dotted rgba(36, 33, 27, .3); transform: translateY(-4px); }
+.menu-body .item-price {
+  font: 700 1rem/1.3 var(--font-body); color: var(--forest); white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.menu-body .item-desc { color: var(--ink-2); font-size: .86rem; line-height: 1.45; margin-top: 3px; font-style: italic; }
+.menu-body .item-allergens { color: var(--text-3); font-size: .72rem; letter-spacing: .02em; text-transform: none; margin-top: 4px; font-weight: 500; }
+.menu-body .item-extra { margin-top: 10px; display: flex; }
+.menu-body .item-extra .variant-row { margin-left: 0; justify-content: flex-start; }
+.menu-body .item-action { flex: 0 0 auto; margin-top: -6px; }
+.menu-body .menu-item.unavailable { opacity: 1; }
+.menu-body .menu-item.unavailable .item-name, .menu-body .menu-item.unavailable .item-price { color: var(--text-3); }
+.menu-body .menu-item.unavailable .item-price { text-decoration: line-through; }
+.menu-body .na-badge { background: transparent; border: 0; color: var(--red); border-radius: 0; font: 600 .7rem/1 var(--font-body); letter-spacing: .12em; text-transform: uppercase; padding: 0; }
+.menu-body /* + / −: diskreten obris, .menu-body rdeče šele ko je izdelek v košarici */
+.menu-body .stepper { margin-left: 0; gap: 4px; }
+.menu-body .step-btn {
+  width: 36px; height: 36px; border-radius: 50%; box-shadow: none;
+  background: transparent; border: 1.5px solid rgba(34, 57, 42, .35); color: var(--forest);
+  font: 400 1.25rem/1 var(--font-body);
+}
+.menu-body .step-btn.add-only:hover { border-color: var(--forest); background: rgba(34, 57, 42, .05); }
+.menu-body .stepper.has-qty .step-btn.plus { background: var(--red); border-color: var(--red); color: #fff; }
+.menu-body .stepper .qty-controls { gap: 4px; }
+.menu-body .step-btn:active { transform: scale(.92); }
+.menu-body .step-qty { min-width: 20px; font: 700 .95rem var(--font-body); color: var(--forest); }
+.menu-body .variant-chip {
+  min-height: 34px; padding: 0 12px; background: transparent; color: var(--forest);
+  border: 1.5px solid rgba(34, 57, 42, .35); border-radius: 999px; font: 600 .8rem/1 var(--font-body);
+}
+.menu-body .variant-chip:active { background: var(--red); border-color: var(--red); color: #fff; }
+.menu-body .menu-footnote {
+  margin: 40px 0 0; padding-top: 16px; border-top: 1px solid rgba(36, 33, 27, .1);
+  text-align: center; color: var(--text-3); font-size: .74rem; line-height: 1.5;
+}
+/* Košarica */
+.menu-body .cart-bar {
+  background: var(--forest); color: var(--cream); border-radius: 999px;
+  box-shadow: 0 12px 32px rgba(34, 57, 42, .35);
+}
+.menu-body .cart-bar-count { background: var(--red); color: #fff; border-radius: 999px; min-width: 30px; }
+.menu-body .cart-bar-label { font-weight: 600; letter-spacing: .01em; }
+.menu-body .cart-bar-total { font: 700 1.05rem var(--font-body); font-variant-numeric: tabular-nums; }
+.menu-body .sheet-backdrop { background: rgba(36, 33, 27, .5); backdrop-filter: none; }
+.menu-body .cart-sheet { background: var(--paper); border-color: var(--line); border-radius: 14px 14px 0 0; }
+.menu-body .sheet-handle { background: var(--cream-2); }
+.menu-body .sheet-header { border-bottom: 1px solid var(--line); padding: 6px 22px 14px; }
+.menu-body .sheet-header h2 { font-size: 1.4rem; }
+.menu-body .sheet-close {
+  width: 36px; height: 36px; min-height: 0; padding: 0; border-radius: 50%;
+  border: 1.5px solid rgba(34, 57, 42, .25); background: transparent; color: var(--forest); font-size: .9rem;
+}
+.menu-body .sheet-body { padding: 6px 22px 14px; }
+.menu-body .sheet-footer { background: var(--cream); border-top: 1px solid var(--line); }
+.menu-body .cart-line { border-bottom: 1px solid rgba(36, 33, 27, .08); padding: 14px 0; }
+.menu-body .cart-line-name { font-weight: 600; }
+.menu-body .cart-line-price { color: var(--text-3); font-size: .82rem; font-variant-numeric: tabular-nums; }
+.menu-body .input.cart-line-note {
+  margin-top: 8px; min-height: 0; padding: 6px 0; font-size: .84rem;
+  background: transparent; border: 0; border-bottom: 1px dashed rgba(36, 33, 27, .25); border-radius: 0; box-shadow: none;
+}
+.menu-body .input.cart-line-note:focus { border-bottom-color: var(--forest); box-shadow: none; }
+.menu-body .line-total { color: var(--forest); font-variant-numeric: tabular-nums; }
+.menu-body .summary-total { font-family: var(--serif); color: var(--forest); }
+.menu-body .summary-total .value { font-variant-numeric: tabular-nums; }
 .menu-body .btn-primary { background: var(--red); border-color: var(--red); color: #fff; border-radius: 4px; min-height: 48px; font-weight: 700; }
 .menu-body .btn-primary:hover { background: var(--red-2); border-color: var(--red-2); }
 .menu-body .input, .menu-body .textarea { background: #fff; border: 1.5px solid #cdbf9f; border-radius: 4px; }

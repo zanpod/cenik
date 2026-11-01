@@ -4,7 +4,7 @@
 // offline fallback). Static assets = cache-first. Cross-origin (Supabase API,
 // CDN) is never intercepted — data always goes to the network.
 // ============================================================================
-const CACHE = 'epo-v5'; // v5: svetla podoba + gostilniški meni
+const CACHE = 'epo-v6'; // v6: prenovljen jedilni list (ime ···· cena)
 const ASSETS = [
   '/', '/index.html',
   '/css/common.css', '/css/menu.css', '/css/admin.css',
