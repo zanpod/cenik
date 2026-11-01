@@ -2,7 +2,8 @@
 // EPO.SI — Edge Function: convert-demo
 // ----------------------------------------------------------------------------
 // Converts a demo tenant into a real (paying) customer: sets tenants.is_demo
-// to false and optionally replaces the placeholder admin account email
+// to false, clears the invoicing data (business name, address, tax number,
+// VAT, FURS — the customer fills these in; the menu stays) and optionally replaces the placeholder admin account email
 // (<slug>@demo.agencijaepo.si) with the customer's real address. The
 // password stays unchanged (the customer already knows it from the demo
 // period).
@@ -65,7 +66,20 @@ Deno.serve(async (req) => {
     if (!tenant) return json({ error: `Lokal "${slug}" ne obstaja.` }, 404);
     if (!tenant.is_demo) return json({ error: `"${tenant.name}" je že prava stranka (ni demo).` }, 409);
 
-    const { error: updTenantErr } = await admin.from('tenants').update({ is_demo: false }).eq('id', tenant.id);
+    // Nova stranka začne s praznimi podatki za račune (naziv firme, naslov,
+    // davčna, DDV, FURS) — testni podatki iz demo obdobja se ne smejo
+    // prenesti. Meni, mize in barve ostanejo.
+    const { error: updTenantErr } = await admin.from('tenants').update({
+      is_demo: false,
+      business_name: null,
+      address: null,
+      tax_number: null,
+      vat_registered: false,
+      default_vat_rate: 22,
+      premise_label: 'P1',
+      device_label: 'BL1',
+      fiscal_enabled: false,
+    }).eq('id', tenant.id);
     if (updTenantErr) return json({ error: updTenantErr.message }, 500);
 
     let emailUpdated = false;

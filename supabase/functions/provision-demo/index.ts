@@ -39,6 +39,19 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
+// Podatki za izdajanje računov — nov lokal (demo ali stranka) jih ima prazne,
+// vpiše jih lastnik sam v Nastavitvah. Meni (kategorije, izdelki) ostane.
+const EMPTY_BUSINESS_DATA = {
+  business_name: null,
+  address: null,
+  tax_number: null,
+  vat_registered: false,
+  default_vat_rate: 22,
+  premise_label: 'P1',
+  device_label: 'BL1',
+  fiscal_enabled: false,
+};
+
 const cors = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-epo-auth',
@@ -207,6 +220,9 @@ Deno.serve(async (req) => {
         currency: body.currency || '€',
         is_demo: true,
         is_active: true,
+        // Podatki za račune vedno prazni: upsert na obstoječem slugu bi
+        // sicer obdržal naziv firme, naslov in davčno od prejšnjega demota.
+        ...EMPTY_BUSINESS_DATA,
       },
       { onConflict: 'slug' }
     ).select().single();
