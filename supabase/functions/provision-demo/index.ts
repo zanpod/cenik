@@ -88,7 +88,7 @@ async function sendCredentialsEmail(toEmail: string, opts: {
 
   const adminUrl = `${APP_DOMAIN}/admin`;
   const text = [
-    `Vaš demo "${opts.demoName}" je pripravljen!`,
+    `Vaš demo »${opts.demoName}« je pripravljen.`,
     '',
     opts.link ? `Povezava za goste (meni): ${opts.link}` : null,
     '',
@@ -96,30 +96,65 @@ async function sendCredentialsEmail(toEmail: string, opts: {
     adminUrl,
     `E-pošta: ${opts.adminEmail}`,
     `Geslo: ${opts.adminPassword}`,
+    '',
+    'Agencija EPO · agencijaepo.si · 070 517 103',
   ].filter((l) => l !== null).join('\n');
 
-  const html = `
-<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:2rem;background:#0a0a0f;color:#f0f0ff;border-radius:12px">
-  <h2 style="color:#4a7fe0;margin-bottom:1rem">Vaš demo "${escHtml(opts.demoName)}" je pripravljen!</h2>
-  ${opts.link ? `<p><strong>Povezava za goste (meni):</strong><br><a href="${escHtml(opts.link)}" style="color:#4a7fe0">${escHtml(opts.link)}</a></p>` : ''}
-  <hr style="border-color:#222;margin:1.25rem 0">
-  <p><strong>Admin prijava</strong> — celoten program: mize/QR kode, naročila v živo, urejanje menija, nastavitve.</p>
-  <table style="width:100%;border-collapse:collapse">
-    <tr><td style="padding:0.4rem 0;color:#aaa;width:100px">Naslov:</td><td><a href="${escHtml(adminUrl)}" style="color:#4a7fe0">${escHtml(adminUrl)}</a></td></tr>
-    <tr><td style="padding:0.4rem 0;color:#aaa">E-pošta:</td><td>${escHtml(opts.adminEmail)}</td></tr>
-    <tr><td style="padding:0.4rem 0;color:#aaa">Geslo:</td><td><strong>${escHtml(opts.adminPassword)}</strong></td></tr>
-  </table>
-  <hr style="border-color:#222;margin:1.25rem 0">
-  <p style="font-size:0.8rem;color:#666">Demo e-cenik — EPO.SI</p>
-</div>`.trim();
+  // Predloga v slogu agencijaepo.si: topla bela, grafit, ena modra, ravni robovi.
+  // Tabelna postavitev in vrstični slogi — tako jo pravilno prikažejo Gmail,
+  // Outlook in Apple Mail (zunanji CSS in flex v e-pošti ne delujeta).
+  const C = { bg: '#f6f3ec', card: '#fffdf8', ink: '#1f1e1b', muted: '#55514a', subtle: '#6f6a61', line: '#e4dfd4', blue: '#2b5bc0', inset: '#f6f3ec' };
+  const FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif";
+  const MONO = "ui-monospace,'SF Mono',Menlo,Consolas,monospace";
+  const row = (label: string, value: string) => `
+          <tr>
+            <td style="padding:10px 0;border-top:1px solid ${C.line};font:13px ${FONT};color:${C.subtle};width:96px;vertical-align:top">${label}</td>
+            <td style="padding:10px 0;border-top:1px solid ${C.line};font:15px ${FONT};color:${C.ink};word-break:break-all">${value}</td>
+          </tr>`;
+  const html = `<!DOCTYPE html>
+<html lang="sl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"><title>Vaš demo je pripravljen</title></head>
+<body style="margin:0;padding:0;background:${C.bg}">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.bg}">
+  <tr><td align="center" style="padding:32px 16px">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px">
+      <tr><td style="padding:0 4px 18px;font:700 22px ${FONT};letter-spacing:-0.3px;color:${C.ink}">EPO<span style="color:${C.blue}">.si</span>
+        <span style="font:12px ${MONO};color:${C.subtle};letter-spacing:0;font-weight:400">&nbsp;· Agencija EPO</span></td></tr>
+      <tr><td style="background:${C.card};border:1px solid ${C.line};border-radius:6px;padding:32px 28px">
+        <p style="margin:0 0 6px;font:12px ${MONO};color:${C.subtle}">Demo digitalnega menija</p>
+        <h1 style="margin:0 0 14px;font:700 24px/1.2 ${FONT};letter-spacing:-0.4px;color:${C.ink}">Vaš demo »${escHtml(opts.demoName)}« je pripravljen</h1>
+        <p style="margin:0 0 22px;font:15px/1.6 ${FONT};color:${C.muted}">Tako bo meni videti vašim gostom. Odprite ga na telefonu – kot da bi skenirali QR kodo na mizi.</p>
+        ${opts.link ? `<table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="background:${C.blue};border-radius:3px">
+          <a href="${escHtml(opts.link)}" style="display:inline-block;padding:12px 20px;font:600 15px ${FONT};color:#ffffff;text-decoration:none">Odprite meni za goste</a>
+        </td></tr></table>
+        <p style="margin:10px 0 0;font:12px ${FONT};color:${C.subtle};word-break:break-all">${escHtml(opts.link)}</p>` : ''}
+
+        <h2 style="margin:30px 0 4px;font:700 17px ${FONT};color:${C.ink}">Prijava v administracijo</h2>
+        <p style="margin:0 0 10px;font:14px/1.6 ${FONT};color:${C.muted}">Celoten program: mize in QR kode, naročila v živo, urejanje menija, nastavitve.</p>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-bottom:1px solid ${C.line}">
+          ${row('Naslov', `<a href="${escHtml(adminUrl)}" style="color:${C.blue};text-decoration:underline">${escHtml(adminUrl)}</a>`)}
+          ${row('E-pošta', escHtml(opts.adminEmail))}
+          ${row('Geslo', `<span style="font:600 15px ${MONO};background:${C.inset};padding:2px 6px;border-radius:3px">${escHtml(opts.adminPassword)}</span>`)}
+        </table>
+        <p style="margin:14px 0 0;font:13px/1.6 ${FONT};color:${C.subtle}">Podatke za prijavo shranite. Demo je namenjen preizkusu – naročila v njem niso prava.</p>
+      </td></tr>
+      <tr><td style="padding:20px 4px 0;font:13px/1.6 ${FONT};color:${C.subtle}">
+        Vprašanja? Odgovorite na to sporočilo ali pokličite <a href="tel:+38670517103" style="color:${C.ink}">070 517 103</a>.<br>
+        <strong style="color:${C.ink}">Agencija EPO</strong> · <a href="https://agencijaepo.si" style="color:${C.blue}">agencijaepo.si</a>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>`;
 
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      from: FROM_EMAIL,
+      // Brez prikaznega imena v FROM_EMAIL dodamo »Agencija EPO«.
+      from: FROM_EMAIL.includes('<') ? FROM_EMAIL : `Agencija EPO <${FROM_EMAIL}>`,
       to: [toEmail],
-      subject: `Vaš demo "${opts.demoName}" je pripravljen`,
+      reply_to: 'info@agencijaepo.si',
+      subject: `Vaš demo »${opts.demoName}« je pripravljen – Agencija EPO`,
       text,
       html,
     }),
