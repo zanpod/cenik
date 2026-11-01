@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#17130f" />
+  <meta name="theme-color" content="#f6f3ec" />
   <title>EPO.SI — Digitalni meni in naročanje za mizo</title>
   <meta name="description" content="EPO.SI — digitalni meni in naročanje za mizo za bare, restavracije in kavarne." />
   <link rel="manifest" href="/manifest.webmanifest" />
@@ -24,15 +24,15 @@
       text-align: center;
     }
     .logo-mark {
-      font-size: 2.6rem;
-      font-weight: 800;
-      letter-spacing: -0.03em;
-      background: linear-gradient(135deg, var(--brand-primary), var(--brand-secondary));
-      -webkit-background-clip: text;
-      background-clip: text;
-      -webkit-text-fill-color: transparent;
+      font-family: var(--font-heading);
+      font-size: 2.4rem;
+      font-weight: 750;
+      letter-spacing: -0.02em;
+      color: var(--text-0);
       margin-bottom: 6px;
     }
+    .logo-mark span { color: var(--brand-primary); }
+    .landing-card { border: 1px solid var(--glass-border); text-align: left; }
     .landing-card p { color: var(--text-1); }
     .landing-actions { margin-top: 26px; display: flex; flex-direction: column; gap: 12px; }
   </style>
@@ -40,7 +40,7 @@
 <body>
   <div class="landing">
     <div class="landing-card glass">
-      <div class="logo-mark">EPO.SI</div>
+      <div class="logo-mark">EPO<span>.si</span></div>
       <p class="muted">Digitalni meni &amp; naročanje za mizo</p>
       <p>Skenirajte QR kodo na vaši mizi za ogled menija in oddajo naročila.</p>
       <div class="landing-actions">

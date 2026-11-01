@@ -63,7 +63,7 @@ const AdminShell = (() => {
 
     shell.innerHTML = `
       <aside class="sidebar">
-        <div class="sidebar-logo">EPO.SI</div>
+        <div class="sidebar-logo">EPO<span style="color:var(--brand-primary)">.si</span></div>
         <div class="sidebar-tenant">${esc(tenant?.name || '')}</div>
         ${navLinks}
         <div class="sidebar-footer">
