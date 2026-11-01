@@ -38,9 +38,9 @@
 
   function renderHeaderActions() {
     document.getElementById('header-actions').innerHTML = `
-      <a class="btn btn-primary btn-sm" href="/admin/new-order.html">➕ Novo naročilo</a>
+      <a class="btn btn-primary btn-sm" href="/admin/new-order.html">Novo naročilo</a>
       <button class="btn btn-sm" id="sound-toggle"></button>
-      <button class="btn btn-sm" id="refresh-btn">🔄 Osveži</button>`;
+      <button class="btn btn-sm" id="refresh-btn">Osveži</button>`;
     updateSoundBtn();
     document.getElementById('sound-toggle').addEventListener('click', () => {
       soundEnabled = !soundEnabled;
@@ -53,7 +53,7 @@
 
   function updateSoundBtn() {
     const b = document.getElementById('sound-toggle');
-    if (b) b.textContent = soundEnabled ? '🔔 Zvok vklopljen' : '🔕 Zvok izklopljen';
+    if (b) b.textContent = soundEnabled ? 'Zvok vklopljen' : 'Zvok izklopljen';
   }
 
   function renderLayout() {
@@ -218,7 +218,7 @@
           <div class="order-actions">
             ${o.status === 'new' ? `<button class="btn btn-success btn-sm" data-act="served" data-id="${o.id}">Postreženo</button>` : ''}
             ${o.status === 'served' ? `<button class="btn btn-sm" data-act="new" data-id="${o.id}">↩ Nazaj na novo</button>` : ''}
-            <button class="btn btn-sm" data-bon="${o.id}">🍳 Bon</button>
+            <button class="btn btn-sm" data-bon="${o.id}">Bon</button>
             <button class="btn btn-danger btn-sm" data-act="cancelled" data-id="${o.id}">Prekliči</button>
           </div>
         </div>`).join('');
@@ -232,7 +232,7 @@
             <span class="order-total" style="margin-left:auto">za plačilo: ${formatPrice(remaining, tenant.currency)}</span>
           </div>
           ${rounds}
-          <button class="btn btn-primary btn-block" data-table-bill="${tid}" data-label="${esc(label)}">🧾 Račun / zapri mizo</button>
+          <button class="btn btn-primary btn-block" data-table-bill="${tid}" data-label="${esc(label)}">Račun / zapri mizo</button>
         </div>`;
     }).join('');
     wireOrderActions();
@@ -263,8 +263,8 @@
     }
     // Invoice + Bon for any non-cancelled order.
     if (o.status !== 'cancelled') {
-      actions += `<button class="btn btn-sm" data-bon="${o.id}">🍳 Bon</button>`;
-      actions += `<button class="btn btn-sm" data-invoice="${o.id}">🧾 Račun</button>`;
+      actions += `<button class="btn btn-sm" data-bon="${o.id}">Bon</button>`;
+      actions += `<button class="btn btn-sm" data-invoice="${o.id}">Račun</button>`;
     }
 
     return `

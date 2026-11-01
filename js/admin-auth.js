@@ -67,7 +67,7 @@ const AdminShell = (() => {
         <div class="sidebar-tenant">${esc(tenant?.name || '')}</div>
         ${navLinks}
         <div class="sidebar-footer">
-          <button class="btn btn-ghost btn-block" id="logout-btn">🚪 Odjava</button>
+          <button class="btn btn-ghost btn-block" id="logout-btn">Odjava</button>
         </div>
       </aside>
       <main class="admin-main">

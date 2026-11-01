@@ -199,7 +199,7 @@
         </table>
       </div>
       <div class="row wrap" style="margin-top:14px">
-        <button class="btn" id="popis-pdf">🖨 Izpiši PDF (viški/manki)</button>
+        <button class="btn" id="popis-pdf">Izpiši PDF (viški/manki)</button>
         <button class="btn btn-primary" id="popis-sync">Uskladi zaloge</button>
       </div>`;
     document.querySelectorAll('.popis-qty').forEach((inp) => inp.addEventListener('input', () => recalcStocktake(inp.closest('tr'))));

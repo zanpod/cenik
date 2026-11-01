@@ -17,7 +17,7 @@
     if (!ctx) return;
     tenant = ctx.tenant;
     document.getElementById('header-actions').innerHTML = `
-      <button class="btn btn-sm" id="open-ingredients">📦 Surovine</button>
+      <button class="btn btn-sm" id="open-ingredients">Surovine</button>
       <button class="btn btn-sm" id="add-cat">＋ Kategorija</button>
       <button class="btn btn-primary btn-sm" id="add-item">＋ Izdelek</button>`;
     document.getElementById('open-ingredients').addEventListener('click', openIngredients);
@@ -58,7 +58,7 @@
           <div class="title">${esc(g.name)}</div>
           <div class="sub">Zaloga: <strong>${(+g.stock_quantity).toLocaleString('sl-SI')}</strong> ${esc(g.unit)}</div>
         </div>
-        <button class="btn btn-sm" data-ing-receive="${g.id}">📥 Prevzem</button>
+        <button class="btn btn-sm" data-ing-receive="${g.id}">Prevzem</button>
         <button class="btn btn-sm btn-danger" data-ing-del="${g.id}">🗑</button>
       </div>`).join('');
     host.querySelectorAll('[data-ing-receive]').forEach((b) => b.addEventListener('click', () => receiveIngredient(b.dataset.ingReceive)));
@@ -234,7 +234,7 @@
           <div class="sub">${formatPrice(it.price, tenant.currency)}${it.description ? ' · ' + esc(it.description) : ''}</div>
         </div>
         <div class="list-card-actions">
-          ${it.track_stock ? `<button class="btn btn-sm" data-restock="${it.id}" title="Dopolni zalogo">📦 +</button>` : ''}
+          ${it.track_stock ? `<button class="btn btn-sm" data-restock="${it.id}" title="Dopolni zalogo">+</button>` : ''}
           <label class="switch" title="Na voljo">
             <input type="checkbox" data-avail="${it.id}" ${it.is_available ? 'checked' : ''}/>
             <span class="track"></span>

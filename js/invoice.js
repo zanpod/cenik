@@ -334,7 +334,7 @@ const Invoice = (() => {
       <div class="modal-actions no-print">
         <button class="btn" id="inv-close2">Zapri</button>
         ${(inv.id && inv.doc_type !== 'storno' && !inv.voided_by_invoice_id) ? '<button class="btn btn-danger" id="inv-storno">Storno</button>' : ''}
-        <button class="btn btn-primary" id="inv-print">🖨 Natisni</button>
+        <button class="btn btn-primary" id="inv-print">Natisni</button>
       </div>`;
     document.getElementById('inv-close2').addEventListener('click', close);
     document.getElementById('inv-print').addEventListener('click', () => printReceipt(inv, tableLabel, qrImg));
