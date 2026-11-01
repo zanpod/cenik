@@ -100,46 +100,67 @@ async function sendCredentialsEmail(toEmail: string, opts: {
     'Agencija EPO · agencijaepo.si · 070 517 103',
   ].filter((l) => l !== null).join('\n');
 
-  // Predloga v slogu agencijaepo.si: topla bela, grafit, ena modra, ravni robovi.
+  // Predloga v slogu admin aplikacije (gostilniški slog): krem podlaga, gozdno
+  // zelena glava, rdeč poudarek, serifni naslovi, razprte male črke za oznake.
   // Tabelna postavitev in vrstični slogi — tako jo pravilno prikažejo Gmail,
   // Outlook in Apple Mail (zunanji CSS in flex v e-pošti ne delujeta).
-  const C = { bg: '#f6f3ec', card: '#fffdf8', ink: '#1f1e1b', muted: '#55514a', subtle: '#6f6a61', line: '#e4dfd4', blue: '#2b5bc0', inset: '#f6f3ec' };
-  const FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif";
+  const C = {
+    bg: '#f4ecdc', paper: '#fbf7ee', cream2: '#eadfc8', forest: '#22392a', pale: '#c9d6c4',
+    red: '#a3302a', ink: '#24211b', muted: '#5b5446', line: '#ddd0b4',
+  };
+  const FONT = "'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif";
+  const SERIF = "Rockwell,'Roboto Slab',Georgia,'Times New Roman',serif";
   const MONO = "ui-monospace,'SF Mono',Menlo,Consolas,monospace";
-  const row = (label: string, value: string) => `
+  const label = (t: string) =>
+    `<p style="margin:0 0 10px;font:700 11px ${FONT};letter-spacing:2.5px;text-transform:uppercase;color:${C.red}">${t}</p>`;
+  const row = (name: string, value: string) => `
           <tr>
-            <td style="padding:10px 0;border-top:1px solid ${C.line};font:13px ${FONT};color:${C.subtle};width:96px;vertical-align:top">${label}</td>
-            <td style="padding:10px 0;border-top:1px solid ${C.line};font:15px ${FONT};color:${C.ink};word-break:break-all">${value}</td>
+            <td style="padding:12px 0;border-top:1px solid ${C.line};font:600 13px ${FONT};color:${C.muted};width:92px;vertical-align:top">${name}</td>
+            <td style="padding:12px 0;border-top:1px solid ${C.line};font:15px ${FONT};color:${C.ink};word-break:break-all">${value}</td>
           </tr>`;
   const html = `<!DOCTYPE html>
-<html lang="sl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"><title>Vaš demo je pripravljen</title></head>
+<html lang="sl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light"><title>Vaš demo je pripravljen</title></head>
 <body style="margin:0;padding:0;background:${C.bg}">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0">Povezava do menija in podatki za prijavo v administracijo.</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.bg}">
-  <tr><td align="center" style="padding:32px 16px">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px">
-      <tr><td style="padding:0 4px 18px;font:700 22px ${FONT};letter-spacing:-0.3px;color:${C.ink}">EPO<span style="color:${C.blue}">.si</span>
-        <span style="font:12px ${MONO};color:${C.subtle};letter-spacing:0;font-weight:400">&nbsp;· Agencija EPO</span></td></tr>
-      <tr><td style="background:${C.card};border:1px solid ${C.line};border-radius:6px;padding:32px 28px">
-        <p style="margin:0 0 6px;font:12px ${MONO};color:${C.subtle}">Demo digitalnega menija</p>
-        <h1 style="margin:0 0 14px;font:700 24px/1.2 ${FONT};letter-spacing:-0.4px;color:${C.ink}">Vaš demo »${escHtml(opts.demoName)}« je pripravljen</h1>
-        <p style="margin:0 0 22px;font:15px/1.6 ${FONT};color:${C.muted}">Tako bo meni videti vašim gostom. Odprite ga na telefonu – kot da bi skenirali QR kodo na mizi.</p>
-        ${opts.link ? `<table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="background:${C.blue};border-radius:3px">
-          <a href="${escHtml(opts.link)}" style="display:inline-block;padding:12px 20px;font:600 15px ${FONT};color:#ffffff;text-decoration:none">Odprite meni za goste</a>
-        </td></tr></table>
-        <p style="margin:10px 0 0;font:12px ${FONT};color:${C.subtle};word-break:break-all">${escHtml(opts.link)}</p>` : ''}
-
-        <h2 style="margin:30px 0 4px;font:700 17px ${FONT};color:${C.ink}">Prijava v administracijo</h2>
-        <p style="margin:0 0 10px;font:14px/1.6 ${FONT};color:${C.muted}">Celoten program: mize in QR kode, naročila v živo, urejanje menija, nastavitve.</p>
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-bottom:1px solid ${C.line}">
-          ${row('Naslov', `<a href="${escHtml(adminUrl)}" style="color:${C.blue};text-decoration:underline">${escHtml(adminUrl)}</a>`)}
-          ${row('E-pošta', escHtml(opts.adminEmail))}
-          ${row('Geslo', `<span style="font:600 15px ${MONO};background:${C.inset};padding:2px 6px;border-radius:3px">${escHtml(opts.adminPassword)}</span>`)}
-        </table>
-        <p style="margin:14px 0 0;font:13px/1.6 ${FONT};color:${C.subtle}">Podatke za prijavo shranite. Demo je namenjen preizkusu – naročila v njem niso prava.</p>
+  <tr><td align="center" style="padding:36px 16px">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:580px;background:${C.paper};border:1px solid ${C.line};border-radius:6px;overflow:hidden">
+      <tr><td style="background:${C.forest};padding:26px 32px 22px">
+        <a href="https://agencijaepo.si" style="font:700 26px ${SERIF};color:#ffffff;letter-spacing:-0.3px;text-decoration:none">agencijaepo<span style="color:#e3b3a9">.si</span></a>
+        <div style="margin-top:6px;font:600 10px ${FONT};letter-spacing:3px;text-transform:uppercase;color:${C.pale}">Agencija EPO &nbsp;·&nbsp; digitalni meni</div>
       </td></tr>
-      <tr><td style="padding:20px 4px 0;font:13px/1.6 ${FONT};color:${C.subtle}">
-        Vprašanja? Odgovorite na to sporočilo ali pokličite <a href="tel:+38670517103" style="color:${C.ink}">070 517 103</a>.<br>
-        <strong style="color:${C.ink}">Agencija EPO</strong> · <a href="https://agencijaepo.si" style="color:${C.blue}">agencijaepo.si</a>
+      <tr><td style="padding:34px 32px 8px">
+        ${label('Demo je pripravljen')}
+        <h1 style="margin:0 0 14px;font:700 28px/1.2 ${SERIF};color:${C.forest}">Vaš demo »${escHtml(opts.demoName)}«</h1>
+        <p style="margin:0 0 24px;font:15px/1.65 ${FONT};color:${C.muted}">Tako bo meni videti vašim gostom. Odprite ga na telefonu – kot da bi skenirali QR kodo na mizi.</p>
+        ${opts.link ? `<table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="background:${C.red};border-radius:3px">
+          <a href="${escHtml(opts.link)}" style="display:inline-block;padding:13px 26px;font:700 15px ${FONT};color:#ffffff;text-decoration:none">Odprite meni za goste</a>
+        </td></tr></table>
+        <p style="margin:10px 0 0;font:12px ${FONT};color:${C.muted};word-break:break-all"><a href="${escHtml(opts.link)}" style="color:${C.muted}">${escHtml(opts.link)}</a></p>` : ''}
+      </td></tr>
+      <tr><td style="padding:28px 32px 6px">
+        <div style="border-top:2px solid ${C.forest};padding-top:26px">
+          ${label('Prijava za osebje')}
+          <h2 style="margin:0 0 6px;font:700 20px ${SERIF};color:${C.forest}">Administracija</h2>
+          <p style="margin:0 0 12px;font:14px/1.6 ${FONT};color:${C.muted}">Celoten program: mize in QR kode, naročila v živo, urejanje menija, nastavitve.</p>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-bottom:1px solid ${C.line}">
+            ${row('Naslov', `<a href="${escHtml(adminUrl)}" style="color:${C.red};font-weight:600;text-decoration:underline">${escHtml(adminUrl)}</a>`)}
+            ${row('E-pošta', `<span style="font-weight:600">${escHtml(opts.adminEmail)}</span>`)}
+            ${row('Geslo', `<span style="font:700 15px ${MONO};color:${C.forest};background:${C.cream2};padding:3px 8px;border-radius:3px">${escHtml(opts.adminPassword)}</span>`)}
+          </table>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:18px"><tr><td style="border:1px solid ${C.forest};border-radius:3px">
+            <a href="${escHtml(adminUrl)}" style="display:inline-block;padding:10px 20px;font:700 14px ${FONT};color:${C.forest};text-decoration:none">Prijava v administracijo</a>
+          </td></tr></table>
+          <p style="margin:18px 0 0;font:13px/1.6 ${FONT};color:${C.muted}">Podatke za prijavo shranite. Demo je namenjen preizkusu – naročila v njem niso prava.</p>
+        </div>
+      </td></tr>
+      <tr><td style="padding:28px 32px 30px">
+        <div style="background:${C.bg};border-radius:4px;padding:16px 18px;font:13px/1.6 ${FONT};color:${C.muted}">
+          Vprašanja? Odgovorite na to sporočilo ali pokličite <a href="tel:+38670517103" style="color:${C.forest};font-weight:600;text-decoration:none">070 517 103</a>.
+        </div>
+      </td></tr>
+      <tr><td style="background:${C.forest};padding:16px 32px;font:12px ${FONT};color:${C.pale}">
+        <strong style="color:#ffffff">Agencija EPO</strong> &nbsp;·&nbsp; <a href="https://agencijaepo.si" style="color:#ffffff;font-weight:600;text-decoration:none">agencijaepo.si</a>
       </td></tr>
     </table>
   </td></tr>
