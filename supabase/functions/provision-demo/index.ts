@@ -86,6 +86,25 @@ async function sendCredentialsEmail(toEmail: string, opts: {
   const FROM_EMAIL = Deno.env.get('FROM_EMAIL') || 'demo@agencijaepo.si';
   if (!RESEND_API_KEY) throw new Error('E-pošta ni nastavljena na strežniku (manjka RESEND_API_KEY) — obrnite se na skrbnika.');
 
+  // QR koda do menija za goste — kot vgrajena slika (CID) in hkrati kot
+  // priponka za tisk. data: URI-jev Gmail ne prikaže, CID pa da. Če
+  // generiranje ne uspe, mail vseeno pošljemo (brez QR).
+  let qrBase64: string | null = null;
+  if (opts.link) {
+    try {
+      const QRCode = (await import('npm:qrcode@1.5.4')).default;
+      const png: Uint8Array = await QRCode.toBuffer(opts.link, {
+        type: 'png', errorCorrectionLevel: 'M', width: 480, margin: 2,
+        color: { dark: '#22392aff', light: '#ffffffff' },
+      });
+      let bin = '';
+      for (let i = 0; i < png.length; i++) bin += String.fromCharCode(png[i]);
+      qrBase64 = btoa(bin);
+    } catch (qrErr) {
+      console.error('Generiranje QR kode ni uspelo, pošiljam brez nje:', qrErr);
+    }
+  }
+
   const adminUrl = `${APP_DOMAIN}/admin`;
   const text = [
     `Vaš demo »${opts.demoName}« je pripravljen.`,
@@ -137,6 +156,13 @@ async function sendCredentialsEmail(toEmail: string, opts: {
           <a href="${escHtml(opts.link)}" style="display:inline-block;padding:13px 26px;font:700 15px ${FONT};color:#ffffff;text-decoration:none">Odprite meni za goste</a>
         </td></tr></table>
         <p style="margin:10px 0 0;font:12px ${FONT};color:${C.muted};word-break:break-all"><a href="${escHtml(opts.link)}" style="color:${C.muted}">${escHtml(opts.link)}</a></p>` : ''}
+        ${qrBase64 ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:24px;background:${C.bg};border:1px solid ${C.line};border-radius:4px"><tr>
+          <td width="148" style="padding:16px;vertical-align:middle"><img src="cid:menu-qr" width="132" height="132" alt="QR koda do menija" style="display:block;width:132px;height:132px;border:0;background:#ffffff"></td>
+          <td style="padding:16px 18px 16px 0;vertical-align:middle">
+            <p style="margin:0 0 6px;font:700 11px ${FONT};letter-spacing:2px;text-transform:uppercase;color:${C.red}">QR koda za mizo</p>
+            <p style="margin:0;font:14px/1.55 ${FONT};color:${C.muted}">Skenirajte s kamero telefona in meni se odpre takoj. Kodo v visoki ločljivosti za tisk najdete v priponki.</p>
+          </td>
+        </tr></table>` : ''}
       </td></tr>
       <tr><td style="padding:28px 32px 6px">
         <div style="border-top:2px solid ${C.forest};padding-top:26px">
@@ -178,6 +204,9 @@ async function sendCredentialsEmail(toEmail: string, opts: {
       subject: `Vaš demo »${opts.demoName}« je pripravljen – Agencija EPO`,
       text,
       html,
+      ...(qrBase64 ? {
+        attachments: [{ filename: 'qr-meni.png', content: qrBase64, content_type: 'image/png', content_id: 'menu-qr' }],
+      } : {}),
     }),
   });
   if (!res.ok) throw new Error(`Napaka pri pošiljanju e-pošte: ${await res.text()}`);
@@ -223,7 +252,7 @@ Deno.serve(async (req) => {
       return json({ error: 'E-poštni naslov ni veljaven.' }, 400);
     }
 
-    const categories = Array.isArray(body.categories) ? body.categories : [];
+    let categories = Array.isArray(body.categories) ? body.categories : [];
     const tableCount = Number.isInteger(body.tables) && body.tables > 0 ? body.tables : 4;
 
     const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
@@ -283,6 +312,21 @@ Deno.serve(async (req) => {
       { onConflict: 'slug' }
     ).select().single();
     if (tErr) return json({ error: `Napaka pri ustvarjanju lokala: ${tErr.message}` }, 500);
+
+    // Brez poslanega menija (javni /demo) dobi lokal osnovni meni iz tabele
+    // default_menu_items (migracija 016), da gost ne vidi praznega menija.
+    if (!categories.length) {
+      const { data: defaults, error: defErr } = await admin.from('default_menu_items')
+        .select('category_name, category_icon, category_sort, name, description, price, sort_order')
+        .order('category_sort').order('sort_order');
+      if (defErr) return json({ error: `Napaka pri branju osnovnega menija: ${defErr.message}` }, 500);
+      const byCat = new Map<string, { name: string; icon: string | null; items: any[] }>();
+      for (const d of defaults || []) {
+        if (!byCat.has(d.category_name)) byCat.set(d.category_name, { name: d.category_name, icon: d.category_icon, items: [] });
+        byCat.get(d.category_name)!.items.push({ name: d.name, description: d.description, price: Number(d.price) });
+      }
+      categories = [...byCat.values()];
+    }
 
     // Replace the whole catalog (safe to re-run — see provision.js for the rationale).
     const { error: delItemsErr } = await admin.from('menu_items').delete().eq('tenant_id', tenant.id);
