@@ -14,8 +14,8 @@
 -- The restaurant/bar/cafe. Each tenant is one business.
 CREATE TABLE IF NOT EXISTS tenants (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL,                    -- "Bar Lipa"
-  slug TEXT UNIQUE NOT NULL,             -- "bar-lipa" (used in URL)
+  name TEXT NOT NULL,                    -- "Testni lokal"
+  slug TEXT UNIQUE NOT NULL,             -- "testni-lokal" (used in URL)
   logo_url TEXT,
   primary_color TEXT DEFAULT '#4a7fe0',  -- brand color
   secondary_color TEXT DEFAULT '#7ba3ec',

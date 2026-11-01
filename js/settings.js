@@ -36,7 +36,7 @@
       <div class="card glass" style="margin-bottom:18px; max-width:620px">
         <h2 style="margin-top:0">Izdajanje računov</h2>
         <p class="muted" style="margin-top:-4px">Podatki za račune po slovenski zakonodaji (ZDDV-1). Davčno potrjevanje (FURS) je v testnem načinu izklopljeno — računi so označeni kot <strong>testni / ni davčno potrjen</strong>.</p>
-        <div class="field"><label>Naziv firme (na računu)</label><input class="input" id="s-business" value="${esc(tenant.business_name || '')}" placeholder="npr. Bar Lipa, Janez Novak s.p." /></div>
+        <div class="field"><label>Naziv firme (na računu)</label><input class="input" id="s-business" value="${esc(tenant.business_name || '')}" placeholder="npr. Testni lokal, Ime Priimek s.p." /></div>
         <div class="field"><label>Naslov sedeža</label><input class="input" id="s-address" value="${esc(tenant.address || '')}" placeholder="Ulica 1, 1000 Ljubljana" /></div>
         <div class="row wrap">
           <div class="field" style="flex:1"><label>Davčna številka</label><input class="input" id="s-tax" value="${esc(tenant.tax_number || '')}" placeholder="12345678" /></div>

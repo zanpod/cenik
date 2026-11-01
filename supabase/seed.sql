@@ -7,7 +7,7 @@
 
 -- Demo tenant
 INSERT INTO tenants (id, name, slug, primary_color, secondary_color, currency)
-VALUES ('11111111-1111-1111-1111-111111111111', 'Bar Lipa', 'bar-lipa', '#6B3FA0', '#2E4A8B', '€')
+VALUES ('11111111-1111-1111-1111-111111111111', 'Testni lokal', 'testni-lokal', '#6B3FA0', '#2E4A8B', '€')
 ON CONFLICT (id) DO NOTHING;
 
 -- Categories
@@ -30,7 +30,7 @@ INSERT INTO menu_items (tenant_id, category_id, name, description, price, sort_o
   ('11111111-1111-1111-1111-111111111111', '22222222-0000-0000-0000-000000000003', 'Točeno pivo 0,5 l', 'Union', 3.20, 0),
   ('11111111-1111-1111-1111-111111111111', '22222222-0000-0000-0000-000000000003', 'Kozarec vina', 'Hišno belo/rdeče', 3.00, 1),
   ('11111111-1111-1111-1111-111111111111', '22222222-0000-0000-0000-000000000004', 'Margarita pica', 'Paradižnik, mozzarella, bazilika', 8.50, 0),
-  ('11111111-1111-1111-1111-111111111111', '22222222-0000-0000-0000-000000000004', 'Burger Lipa', 'Goveji burger s pomfritom', 11.00, 1),
+  ('11111111-1111-1111-1111-111111111111', '22222222-0000-0000-0000-000000000004', 'Testni burger', 'Goveji burger s pomfritom', 11.00, 1),
   ('11111111-1111-1111-1111-111111111111', '22222222-0000-0000-0000-000000000005', 'Tiramisu', 'Domači tiramisu', 4.20, 0)
 ON CONFLICT DO NOTHING;
 

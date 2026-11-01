@@ -4,7 +4,7 @@
 // ----------------------------------------------------------------------------
 // Uporaba:
 //   node provision.js <pot-do-json-datoteke>
-//   node provision.js examples/kavarna-vahtnca.json
+//   node provision.js examples/testni-lokal.json
 //
 // Glej scripts/demo/README.md za obliko vhodne JSON datoteke.
 // ============================================================================
@@ -24,7 +24,7 @@ function fail(msg) {
 
 const inputPath = process.argv[2];
 if (!inputPath) {
-  fail('Uporaba: node provision.js <pot-do-json-datoteke>\n  Primer: node provision.js examples/kavarna-vahtnca.json');
+  fail('Uporaba: node provision.js <pot-do-json-datoteke>\n  Primer: node provision.js examples/testni-lokal.json');
 }
 
 let input;
@@ -36,7 +36,7 @@ try {
 
 const { slug, name } = input;
 if (!slug || typeof slug !== 'string' || !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug)) {
-  fail('Polje "slug" je obvezno in sme vsebovati le male črke, številke in vezaje (npr. "kavarna-vahtnca").');
+  fail('Polje "slug" je obvezno in sme vsebovati le male črke, številke in vezaje (npr. "testni-lokal").');
 }
 if (!name || typeof name !== 'string') {
   fail('Polje "name" je obvezno.');

@@ -22,7 +22,7 @@ organized by table.
 ├── js/                     -- supabase-config.js + per-page logic
 ├── assets/                 -- notification.wav, logo.svg
 ├── supabase/schema.sql     -- Tables, RLS, storage, realtime
-├── supabase/seed.sql       -- Sample data (demo venue "Bar Lipa")
+├── supabase/seed.sql       -- Sample data (demo venue "Testni lokal")
 ├── netlify.toml / _redirects
 ```
 
@@ -34,7 +34,7 @@ organized by table.
 2. In the **SQL Editor**, run `supabase/schema.sql` (creates the tables, RLS
    policies, the `menu-images` storage bucket, and enables Realtime on
    `orders` + `order_items`).
-3. (Optional) Run `supabase/seed.sql` for the demo venue **Bar Lipa**.
+3. (Optional) Run `supabase/seed.sql` for the demo venue **Testni lokal**.
 4. Under **Authentication → Providers**, enable **Email** (password).
 5. Create an admin user (Authentication → Users → Add user) and link them to
    a venue — uncomment the `profiles` INSERT at the bottom of `seed.sql` and
